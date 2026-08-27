@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Persistent evidence-aware task explorer and read-only multi-protocol API for Technocore work tapes.">
+  <title>{% block title %}Technocore Tasks{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', path='/favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='/overrides.css') }}">
+  <script src="{{ url_for('static', path='/app.js') }}" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/"><span class="brand-mark">TC</span><span>Technocore Tasks</span></a>
+    <nav aria-label="Main navigation"><a href="/">Board</a><a href="/protocols">Protocols</a><a href="/ecosystem">Ecosystem</a><a href="/api/docs">API</a></nav>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+  <footer>
+    <p>Independent community tool · Not affiliated with FLOP Labs · Read-only hosted mode</p>
+    <p>Signed events prove key possession for one write—not identity, trust, payment, or settlement. v{{ version }}</p>
+  </footer>
+</body>
+</html>

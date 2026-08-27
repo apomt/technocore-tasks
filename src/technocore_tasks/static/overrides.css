@@ -1,0 +1,30 @@
+.reward b {
+  color: var(--ink);
+}
+
+.protocol-badge { display:inline-flex; align-items:center; padding:.25rem .55rem; border:1px solid #6f8fff; color:#b9c8ff; font:700 .72rem/1 monospace; letter-spacing:.04em; border-radius:999px; }
+select { background:#10131a; color:#eef1f6; border:1px solid #343b4b; border-radius:4px; padding:.65rem; margin-top:.5rem; }
+html, body { overflow-x: clip; }
+.detail-main, .evidence, .raw, aside, dd, .mono { min-width:0; overflow-wrap:anywhere; }
+.detail-layout { min-width:0; }
+.history-notice { margin:32px max(24px,7vw) 0; padding:20px 22px; border:1px solid #a13b14; background:#fff5ed; }
+.history-notice>div { display:flex; justify-content:space-between; gap:20px; }
+.history-notice p { margin:.7rem 0 0; line-height:1.5; }
+.provenance-strip { margin:18px max(24px,7vw) 0; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); border:1px solid var(--ink); }
+.provenance-strip>div { padding:16px; border-right:1px solid var(--ink); display:flex; flex-direction:column; gap:6px; }
+.provenance-strip>div:last-child { border-right:0; }
+.provenance-strip b { text-transform:uppercase; font-size:11px; }
+.provenance-strip span { color:var(--muted); font-size:13px; line-height:1.4; }
+.partial-banner p { margin:.55rem 0 0; line-height:1.45; }
+.protocols-hero { padding:72px max(24px,7vw) 50px; border-bottom:1px solid var(--ink); }
+.protocols-hero h1 { font-size:clamp(48px,8vw,100px); line-height:.9; letter-spacing:-.055em; margin:0; text-transform:uppercase; }
+.protocols-hero p { max-width:760px; font-size:18px; line-height:1.55; margin-top:28px; }
+.protocol-page { padding:40px max(24px,7vw) 80px; display:grid; gap:28px; }
+.protocol-panel { border:1px solid var(--ink); padding:28px; background:var(--panel); box-shadow:5px 5px 0 var(--ink); }
+.protocol-heading { display:flex; justify-content:space-between; align-items:center; gap:20px; }
+.protocol-heading code { color:var(--muted); text-align:right; }
+.provenance-block { margin-top:28px; padding-top:20px; border-top:1px solid var(--line); }
+.provenance-block h2 { text-transform:uppercase; font-size:18px; }
+.provenance-block li { margin:.5rem 0; line-height:1.45; }
+.grammar { background:var(--ink); color:var(--acid); padding:18px; overflow:auto; white-space:pre-wrap; }
+@media(max-width:800px){.provenance-strip{grid-template-columns:1fr}.provenance-strip>div{border-right:0;border-bottom:1px solid var(--ink)}.provenance-strip>div:last-child{border-bottom:0}.history-notice>div,.protocol-heading{flex-direction:column;align-items:flex-start}.protocol-heading code{text-align:left}}

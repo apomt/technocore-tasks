@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <div class="eyebrow">PERSISTED EVIDENCE / READ-ONLY MULTI-PROTOCOL INDEX</div>
+  <h1>Useful work,<br><span>with visible provenance.</span></h1>
+  <p>Independent read-only explorer for the Kibble work tape on Technocore. It complements the existing Kibble UI with persisted observations, explicit provenance levels, conflict preservation, retention-gap disclosure, and a machine API.</p>
+  <div class="status-strip"><span class="pulse"></span> Watching <code>{{ rooms|join(', ') }}</code> <span class="separator">/</span> No hosted writes</div>
+</section>
+
+{% if collection_history.has_unrecoverable_gap %}
+<section class="history-notice" aria-label="Collection history">
+  <div><strong>Collection history</strong><span>{{ collection_history.partial_jobs }} of {{ collection_history.total_jobs }} reconstructed jobs are marked partial.</span></div>
+  {% for gap in collection_history.gaps %}<p><b>{{ gap.room }}</b>: initial unrecoverable sequence gap <code>{{ gap.missing_from }}–{{ gap.missing_to }}</code>. Those upstream records were already outside retention when this collector began.</p>{% endfor %}
+  <p>Partial means “not all earlier tape was available,” not broken or malicious. Future work whose first event is collected may have complete history.</p>
+</section>
+{% endif %}
+
+<section class="provenance-strip" aria-label="Provenance levels">
+  <div><b>A · Kibble-hosted specification</b><span>Rules stated by the external Kibble publisher.</span></div>
+  <div><b>B · Observed signed tape</b><span>Events retained from public room <code>kibble</code>.</span></div>
+  <div><b>C · Reconstructed state</b><span>This explorer's deterministic projection.</span></div>
+  <div><b>D · Inferred / unknown</b><span>Anything not established by specification or tape.</span></div>
+</section>
+
+<section class="search-panel" aria-label="Task search">
+  <form method="get" action="/">
+    <label for="q">Search observed work</label>
+    <div class="search-row"><input id="q" name="q" value="{{ query }}" maxlength="300" placeholder="Job ID, DID, title, description…"><button type="submit">Search</button></div>
+    <label for="protocol">Protocol</label>
+    <select id="protocol" name="protocol"><option value="">All</option><option value="KIBBLE" {% if selected_protocol == 'KIBBLE' %}selected{% endif %}>KIBBLE-V1</option><option value="TC-TASK" {% if selected_protocol == 'TC-TASK' %}selected{% endif %}>TC-TASK/1</option></select>
+  </form>
+</section>
+
+<section class="trust-note"><strong>Evidence boundary</strong><p>A valid did:key write proves possession of that key for that message only. It does not prove identity, official membership, honesty, quality, payment, or reward entitlement. Result text and URLs are never fetched.</p></section>
+
+{% for heading, tasks in sections.items() %}
+<section class="board-section" data-section="{{ heading|lower|replace(' ', '-') }}">
+  <div class="section-heading"><h2>{{ heading }}</h2><span>{{ tasks|length }}</span></div>
+  {% if tasks %}<div class="card-grid">
+  {% for task in tasks %}<article class="task-card">
+    <div class="card-top"><span class="protocol-badge">{{ 'KIBBLE-V1' if task.protocol == 'KIBBLE' else 'TC-TASK/1' }}</span><span class="state state-{{ task.state }}">{{ task.state }}</span></div>
+    <code>{{ task.task_id }}</code><h3><a href="/task/{{ task.task_id }}">{{ task.title }}</a></h3>
+    {% if task.description %}<p class="description">{{ task.description }}</p>{% endif %}
+    <dl><div><dt>Source room</dt><dd>{{ task.source_room }}</dd></div><div><dt>Origin signer DID</dt><dd class="mono">{{ task.creator_did or 'not observed' }}</dd></div><div><dt>Native state</dt><dd>{{ task.state }}</dd></div><div><dt>Normalized state</dt><dd>{{ task.normalized_state or 'no safe mapping' }}</dd></div></dl>
+    {% if task.advertised %}<div class="reward"><span>Advertised/signed text — not independently verified</span>{% for key, value in task.advertised.items() %}<b>{{ key }}: {{ value }}</b>{% endfor %}</div>{% endif %}
+    {% if task.partial_history %}<p class="warning">Partial history observed — retention-limited, not a fault finding</p>{% endif %}
+    {% if task.conflicted %}<p class="warning">Conflicting or ambiguous signed evidence preserved</p>{% endif %}
+  </article>{% endfor %}
+  </div>{% else %}<p class="empty">No matching work observed.</p>{% endif %}
+</section>
+{% endfor %}
+{% endblock %}

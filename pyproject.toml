@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "technocore-tasks"
+version = "0.1.0"
+description = "Evidence-aware public task coordination over signed Technocore messages"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "Apache-2.0"}
+authors = [{name = "Technocore community contributors"}]
+dependencies = [
+  "fastapi>=0.115,<1",
+  "httpx>=0.27,<1",
+  "jinja2>=3.1,<4",
+  "cryptography>=43,<46",
+  "uvicorn[standard]>=0.30,<1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.3,<9", "pytest-asyncio>=0.24,<1"]
+
+[project.scripts]
+technocore-tasks = "technocore_tasks.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/technocore_tasks"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q -m 'not live'"
+asyncio_mode = "auto"
+markers = ["live: read-only compatibility checks against the public Technocore service"]

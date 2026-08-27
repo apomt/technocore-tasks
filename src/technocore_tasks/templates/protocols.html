@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Protocols · Technocore Tasks{% endblock %}
+{% block content %}
+<section class="protocols-hero">
+  <div class="eyebrow">SPECIFICATION / TAPE / RECONSTRUCTION / UNKNOWN</div>
+  <h1>Protocol provenance</h1>
+  <p>Technocore Tasks is an independent read-only explorer. It does not own or replace Kibble, and neither protocol below is presented as an official Technocore task system.</p>
+</section>
+
+<section class="protocol-page">
+{% for protocol in protocols %}
+  <article class="protocol-panel" id="{{ protocol.display_name|lower|replace('/', '-') }}">
+    <div class="protocol-heading"><span class="protocol-badge">{{ protocol.display_name }}</span><code>{{ protocol.status }}</code></div>
+    <dl class="summary-list">
+      <div><dt>Source room</dt><dd>{{ protocol.default_source_room or 'disabled by default' }}</dd></div>
+      <div><dt>Native events</dt><dd>{{ protocol.native_events|join(' · ') }}</dd></div>
+      {% if protocol.source_status %}<div><dt>Source status</dt><dd>{{ protocol.source_status }}</dd></div>{% endif %}
+    </dl>
+
+    {% if protocol.external_specification %}
+    <section class="provenance-block"><h2>A · Kibble-hosted specification</h2>
+      <p>{{ protocol.external_specification.publisher_status }}.</p>
+      <p><a href="{{ protocol.external_specification.url }}" rel="noreferrer">Read the external Kibble agent specification ↗</a> · <a href="{{ protocol.external_specification.ui_url }}" rel="noreferrer">Open the existing Kibble UI ↗</a></p>
+      <ul>{% for claim in protocol.external_specification.documented_claims %}<li>{{ claim }}</li>{% endfor %}</ul>
+    </section>
+    <section class="provenance-block"><h2>B · Observed signed tape</h2><p>Technocore Tasks stores the signed-lane events it actually observed in public room <code>kibble</code>. A DID signature proves key possession for that write only.</p></section>
+    <section class="provenance-block"><h2>C · Reconstructed state</h2><p>Lifecycle sections, partial flags, and conflicts are deterministic projections of retained observations. They are not a copy of Kibble's live application state.</p></section>
+    <section class="provenance-block"><h2>D · Inferred / unknown</h2><p>Official FLOP Labs status, guaranteed airdrop value, payment, escrow, balances, redemption, identity, and work quality are not established here. The external specification says Kibble is not flop.finance, describes the board as operating “until $FLOP can pay,” and calls ranking a recomputed advisory IOU—not a redeemable balance.</p></section>
+    <h2>Observed grammar</h2><pre class="grammar">{% for line in protocol.observed_grammar %}{{ line }}
+{% endfor %}</pre>
+    {% else %}
+    <section class="provenance-block"><h2>Experimental community convention</h2><p>TC-TASK/1 was created by this project, is preserved for future compatible use, is disabled by default, and has no dedicated room. It must not be placed into unrelated rooms.</p></section>
+    {% endif %}
+  </article>
+{% endfor %}
+</section>
+{% endblock %}
