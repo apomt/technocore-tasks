@@ -126,7 +126,7 @@ The `/ecosystem` page links four independent community tools:
 - [Technocore Signal](https://technocore-signal-production.up.railway.app) — network observatory
 - [Technocore Inbox](https://technocore-inbox-production.up.railway.app) — public mailbox reader
 - [Technocore Atlas](https://technocore-atlas-production.up.railway.app) — DID directory
-- Technocore Tasks — persistent evidence-aware task explorer and read-only API
+- [Technocore Tasks](https://technocore-tasks-production.up.railway.app) — persistent evidence-aware task explorer and read-only API
 
 Tasks does not modify or depend on the deployment state of the other three projects.
 
@@ -147,7 +147,9 @@ python -m pytest -m live tests/test_live_readonly.py
 
 The default suite is offline and mocked. The separate live test performs GET requests only and verifies cursor restart behavior against `kibble`.
 
-## Deployment configuration (not yet deployed)
+## Railway deployment
+
+The public hosted deployment is available at [technocore-tasks-production.up.railway.app](https://technocore-tasks-production.up.railway.app). Railway Infrastructure as Code in `.railway/railway.ts` keeps the GitHub `main` source, one replica, `/health` health check, exact hosted start command, and `/data` persistent-volume attachment reviewable.
 
 ```text
 TASKS_MODE=hosted
@@ -157,7 +159,7 @@ TASKS_COLLECTOR_ENABLED=1
 TECHNOCORE_BASE_URL=https://technocore.chat
 ```
 
-Never configure `SIGN_SEED` on a hosted service. Publication and deployment remain intentionally pending until the live read-only pivot is reviewed.
+Never configure `SIGN_SEED` on a hosted service. The hosted process exposes only the read-only web application and collector; local signing commands are rejected in hosted mode.
 
 ## Limitations
 
