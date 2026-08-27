@@ -104,3 +104,13 @@ def test_ecosystem_positions_tasks_as_persistent_read_only_explorer(store):
     with client_for(store) as client:
         page = client.get("/ecosystem")
     assert "Persistent evidence-aware task explorer and read-only API" in page.text
+
+
+def test_static_assets_use_proxy_safe_root_relative_urls(store):
+    with client_for(store) as client:
+        page = client.get("/")
+    assert 'href="/static/styles.css"' in page.text
+    assert 'href="/static/overrides.css"' in page.text
+    assert 'href="/static/favicon.svg"' in page.text
+    assert 'src="/static/app.js"' in page.text
+    assert 'href="http://testserver/static/' not in page.text
