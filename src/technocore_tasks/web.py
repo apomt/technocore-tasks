@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
@@ -26,6 +27,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     store = Store(settings.database)
     board = Board(store)
     collectors = [Collector(store, settings.base_url, room) for room in settings.source_rooms]
+    broad_read_gate = threading.Semaphore(1)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -76,19 +78,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     def home(request: Request, q: str = Query("", max_length=300), protocol: str | None = None,
              page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200)):
-        tasks, pagination = board.search_page(q, protocol=protocol, page=page, page_size=page_size)
-        sections = {
-            "Open work": [t for t in tasks if t.normalized_state == "open"],
-            "Claimed work": [t for t in tasks if t.normalized_state == "claimed"],
-            "Results submitted": [t for t in tasks if t.normalized_state == "results_submitted"],
-            "Attested/completed": [t for t in tasks if t.normalized_state == "attested_completed"],
-            "Conflicted": [t for t in tasks if t.conflicted],
-            "Partial histories": [t for t in tasks if t.partial_history],
-        }
-        return templates.TemplateResponse(request, "home.html",
-            context(request, sections=sections, query=q, selected_protocol=protocol or "",
-                    collection_history=collection_history(), pagination=pagination,
-                    maintenance=store.maintenance_status()))
+        with broad_read_gate:
+            tasks, pagination = board.search_page(q, protocol=protocol, page=page, page_size=page_size)
+            sections = {
+                "Open work": [t for t in tasks if t.normalized_state == "open"],
+                "Claimed work": [t for t in tasks if t.normalized_state == "claimed"],
+                "Results submitted": [t for t in tasks if t.normalized_state == "results_submitted"],
+                "Attested/completed": [t for t in tasks if t.normalized_state == "attested_completed"],
+                "Conflicted": [t for t in tasks if t.conflicted],
+                "Partial histories": [t for t in tasks if t.partial_history],
+            }
+            return templates.TemplateResponse(request, "home.html",
+                context(request, sections=sections, query=q, selected_protocol=protocol or "",
+                        collection_history=collection_history(), pagination=pagination,
+                        maintenance=store.maintenance_status()))
 
     @app.get("/task/{task_id}", response_class=HTMLResponse)
     def task_detail(request: Request, task_id: str, page: int = Query(1, ge=1),
@@ -118,8 +121,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def api_tasks(q: str = Query("", max_length=300), state: str | None = None,
                   protocol: str | None = None, page: int = Query(1, ge=1),
                   page_size: int = Query(50, ge=1, le=200)):
-        tasks, pagination = board.search_page(q, state, protocol, page, page_size)
-        return {"tasks": [task.to_dict(detail=False) for task in tasks], "pagination": pagination}
+        with broad_read_gate:
+            tasks, pagination = board.search_page(q, state, protocol, page, page_size)
+            return {"tasks": [task.to_dict(detail=False) for task in tasks], "pagination": pagination}
 
     @app.get("/api/tasks/{task_id}")
     def api_task(task_id: str, protocol: str | None = None, page: int = Query(1, ge=1),
@@ -133,13 +137,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                       page_size: int = Query(50, ge=1, le=200)):
         if not DID_RE.fullmatch(did):
             raise HTTPException(404)
-        tasks, pagination = board.did_tasks_page(did, page, page_size)
-        return {"did": did, "tasks": [task.to_dict(detail=False) for task in tasks], "pagination": pagination}
+        with broad_read_gate:
+            tasks, pagination = board.did_tasks_page(did, page, page_size)
+            return {"did": did, "tasks": [task.to_dict(detail=False) for task in tasks], "pagination": pagination}
 
     @app.get("/api/stats")
     def api_stats():
-        return {**board.stats(), "maintenance": store.maintenance_status(),
-                "collectors": [collector.diagnostics() for collector in collectors]}
+        with broad_read_gate:
+            return {**board.stats(), "maintenance": store.maintenance_status(),
+                    "collectors": [collector.diagnostics() for collector in collectors]}
 
     @app.get("/api/protocols")
     def api_protocols():
