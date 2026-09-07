@@ -108,6 +108,32 @@ async def test_critical_capacity_pauses_collection_without_network_or_cursor_cha
     assert requests == 0
 
 
+@pytest.mark.asyncio
+async def test_catchup_checkpoints_large_wal_within_a_page(store, dids, monkeypatch):
+    messages = [{"seq": seq, "ts": f"2026-09-07T00:00:{seq:02d}Z", "from": dids[0],
+                 "nonce": seq, "text": "unparsed public evidence"} for seq in range(1, 31)]
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"messages": messages, "first_seq": 1,
+                                         "last_seq": 30})
+
+    checkpoints = 0
+    original = store.checkpoint_wal
+
+    def checkpoint():
+        nonlocal checkpoints
+        checkpoints += 1
+        return original()
+
+    monkeypatch.setattr(store, "checkpoint_wal", checkpoint)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="https://example.test") as client:
+        result = await Collector(store, "https://example.test", "kibble", client=client).collect_once(
+            refresh_metadata=False, max_pages=1)
+
+    assert result["inserted"] == 30
+    assert checkpoints == 2
+
+
 def test_storage_diagnostics_never_invoke_destructive_file_operations(tmp_path, monkeypatch):
     database = tmp_path / "tasks.db"
     database.write_bytes(b"evidence")

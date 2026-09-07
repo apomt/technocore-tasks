@@ -38,6 +38,7 @@ class Collector:
         self.catchup_pages = 5
         self.write_batch_size = 1
         self.write_pause_seconds = 0.05
+        self.wal_checkpoint_interval = 25
         self.running = False
         self.last_success_at: str | None = None
         self.last_error: str | None = None
@@ -104,11 +105,25 @@ class Collector:
                 first_seq = payload.get("first_seq")
                 if first_seq is not None and int(first_seq) > cursor + 1:
                     await asyncio.to_thread(self.store.record_gap, self.room, cursor + 1, int(first_seq) - 1)
+                processed = 0
                 for start in range(0, len(messages), self.write_batch_size):
                     batch = messages[start:start + self.write_batch_size]
                     inserted += await asyncio.to_thread(self.store.insert_messages, self.room, batch)
+                    processed += len(batch)
+                    if processed % self.wal_checkpoint_interval == 0:
+                        self.last_wal_checkpoint = await asyncio.to_thread(self.store.checkpoint_wal)
+                        storage = await asyncio.to_thread(self.store.storage_health, *self.storage_thresholds)
+                        self.storage_state = storage["state"]
+                        if (self.pause_on_critical_storage and storage["available"]
+                                and storage["state"] == "critical"):
+                            self.paused_for_storage = True
+                            return {"pages": pages, "inserted": inserted, "cursor": cursor,
+                                    "gaps": await asyncio.to_thread(self.store.gaps, self.room),
+                                    "paused_for_storage": True}
                     if write_pause_seconds:
                         await asyncio.sleep(write_pause_seconds)
+                if messages and processed % self.wal_checkpoint_interval:
+                    self.last_wal_checkpoint = await asyncio.to_thread(self.store.checkpoint_wal)
                 new_cursor = int(payload.get("last_seq", cursor))
                 if new_cursor < cursor:
                     raise RuntimeError("Technocore cursor moved backwards")
@@ -152,6 +167,7 @@ class Collector:
                 "catchup_page_limit": self.catchup_pages,
                 "write_batch_size": self.write_batch_size,
                 "write_pause_seconds": self.write_pause_seconds,
+                "wal_checkpoint_interval": self.wal_checkpoint_interval,
                 "last_wal_checkpoint": self.last_wal_checkpoint,
                 "storage_state": self.storage_state,
                 "paused_for_storage": self.paused_for_storage,
