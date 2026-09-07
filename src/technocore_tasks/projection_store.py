@@ -4,12 +4,14 @@ import hashlib
 import json
 import sqlite3
 import threading
+from datetime import UTC, datetime
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
 from .events import DID_RE, canonical_task_id
 from .protocols import detect_and_parse
+from .capacity import storage_metrics
 
 PROJECTION_VERSION = 1
 DEFAULT_PAGE_SIZE = 50
@@ -60,6 +62,7 @@ class Store:
     def __init__(self, path: str | Path):
         self.path = str(path)
         self.io_gate = IOGate()
+        self.last_successful_wal_checkpoint_at: str | None = None
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         self.initialize()
 
@@ -550,8 +553,35 @@ class Store:
         except sqlite3.Error as exc:
             return {"available": False, "error": type(exc).__name__}
 
+    def fast_counts(self) -> dict[str, int]:
+        """Use indexed rowid maxima; these append-only/rebuilt tables do not delete individual rows."""
+        with self.connect() as db:
+            observations = int(db.execute(
+                "SELECT COALESCE(MAX(rowid),0) FROM observations"
+            ).fetchone()[0])
+            projected_tasks = int(db.execute(
+                "SELECT COALESCE(MAX(rowid),0) FROM task_projections"
+            ).fetchone()[0])
+        return {"observation_count": observations, "projected_task_count": projected_tasks}
+
+    def storage_health(self, warning: float = 80.0, urgent: float = 90.0,
+                       critical: float = 95.0) -> dict:
+        try:
+            counts: dict[str, int | None] = self.fast_counts()
+        except sqlite3.Error:
+            counts = {"observation_count": None, "projected_task_count": None}
+        return {
+            **storage_metrics(self.path, warning, urgent, critical),
+            **counts,
+            "last_successful_wal_checkpoint_at": self.last_successful_wal_checkpoint_at,
+            "destructive_cleanup_enabled": False,
+        }
+
     def checkpoint_wal(self) -> dict[str, int]:
         with self.connect() as db:
             busy, log_pages, checkpointed_pages = db.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
-        return {"busy": int(busy), "log_pages": int(log_pages),
-                "checkpointed_pages": int(checkpointed_pages)}
+        result = {"busy": int(busy), "log_pages": int(log_pages),
+                  "checkpointed_pages": int(checkpointed_pages)}
+        if not result["busy"]:
+            self.last_successful_wal_checkpoint_at = datetime.now(UTC).isoformat()
+        return result

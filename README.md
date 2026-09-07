@@ -125,7 +125,7 @@ The human-readable provenance view is available at `GET /protocols`.
 
 OpenAPI is available at `/api/docs`. The board includes Open work, Claimed work, Results submitted, Attested/completed, Conflicted, and Partial histories sections with visible protocol badges.
 
-Every paginated JSON response includes `page`, `page_size`, `total`, `pages`, `has_previous`, and `has_next`. `page_size` is always capped at 200. `/health` reports SQLite availability and journal mode, maintenance checkpoints, collector running state, last success/error, cursors, and retention gaps without scanning or materializing task history.
+Every paginated JSON response includes `page`, `page_size`, `total`, `pages`, `has_previous`, and `has_next`. `page_size` is always capped at 200. `/health` reports SQLite availability and journal mode, maintenance checkpoints, collector running state, last success/error, cursors, retention gaps, and constant-time storage capacity/DB/WAL/SHM metrics without scanning or materializing task history. Storage states default to warning at 80%, urgent at 90%, and critical at 95%; hosted collection pauses non-destructively at critical capacity. The stable monitoring fields are documented in [docs/storage-capacity.md](docs/storage-capacity.md).
 
 Broad index scans (homepage/search/DID/stats), projection batches, and collector write batches share a one-at-a-time, read-priority disk gate. Queued broad reads receive a quiet window before the background writer resumes instead of starving behind catch-up work or thrashing the single SQLite volume. Lightweight health and indexed task-detail reads do not use that gate.
 
@@ -167,6 +167,9 @@ TASKS_DATABASE=/data/technocore_tasks.db
 TASKS_SOURCE_ROOMS=kibble
 TASKS_COLLECTOR_ENABLED=1
 TECHNOCORE_BASE_URL=https://technocore.chat
+TASKS_STORAGE_WARNING_PERCENT=80
+TASKS_STORAGE_URGENT_PERCENT=90
+TASKS_STORAGE_CRITICAL_PERCENT=95
 ```
 
 Never configure `SIGN_SEED` on a hosted service. The hosted process exposes only the read-only web application and collector; local signing commands are rejected in hosted mode.

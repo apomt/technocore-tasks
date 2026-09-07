@@ -25,7 +25,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     store = Store(settings.database)
     board = Board(store)
-    collectors = [Collector(store, settings.base_url, room) for room in settings.source_rooms]
+    storage_thresholds = settings.storage_thresholds()
+    collectors = [Collector(store, settings.base_url, room, storage_thresholds=storage_thresholds,
+                            pause_on_critical_storage=settings.mode == "hosted")
+                  for room in settings.source_rooms]
     broad_read_gate = store.io_gate
 
     @asynccontextmanager
@@ -112,9 +115,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health():
         database = store.database_health()
         maintenance = store.maintenance_status()
-        return {"status": "ok" if database["available"] else "degraded", "mode": settings.mode,
+        storage = store.storage_health(*storage_thresholds)
+        status = "degraded" if not database["available"] or storage["state"] == "critical" else "ok"
+        return {"status": status, "mode": settings.mode,
                 "signing": False, "source_rooms": settings.source_rooms, "database": database,
-                "maintenance": maintenance, "collectors": [collector.diagnostics() for collector in collectors]}
+                "storage": storage, "maintenance": maintenance,
+                "collectors": [collector.diagnostics() for collector in collectors]}
 
     @app.get("/api/tasks")
     def api_tasks(q: str = Query("", max_length=300), state: str | None = None,

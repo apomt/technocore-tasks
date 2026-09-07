@@ -20,6 +20,8 @@ class Collector:
         room: str,
         client: httpx.AsyncClient | None = None,
         sleeper: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        storage_thresholds: tuple[float, float, float] = (80.0, 90.0, 95.0),
+        pause_on_critical_storage: bool = False,
     ):
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,47}", room):
             raise ValueError("invalid public room name")
@@ -30,6 +32,8 @@ class Collector:
         self.room = room
         self.client = client
         self.sleeper = sleeper
+        self.storage_thresholds = storage_thresholds
+        self.pause_on_critical_storage = pause_on_critical_storage
         self.page_size = 200
         self.catchup_pages = 5
         self.write_batch_size = 1
@@ -38,6 +42,8 @@ class Collector:
         self.last_success_at: str | None = None
         self.last_error: str | None = None
         self.last_wal_checkpoint: dict | None = None
+        self.storage_state = "unknown"
+        self.paused_for_storage = False
 
     async def refresh_metadata(self, client: httpx.AsyncClient) -> None:
         agent = (await client.get("/.well-known/agent.json")).raise_for_status().json()
@@ -75,6 +81,15 @@ class Collector:
 
     async def collect_once(self, refresh_metadata: bool = True, max_pages: int = 100,
                            write_pause_seconds: float = 0.0) -> dict:
+        storage = await asyncio.to_thread(self.store.storage_health, *self.storage_thresholds)
+        self.storage_state = storage["state"]
+        self.paused_for_storage = bool(
+            self.pause_on_critical_storage and storage["available"] and storage["state"] == "critical"
+        )
+        if self.paused_for_storage:
+            return {"pages": 0, "inserted": 0, "cursor": await asyncio.to_thread(
+                    self.store.cursor, self.room), "gaps": await asyncio.to_thread(
+                    self.store.gaps, self.room), "paused_for_storage": True}
         owns_client = self.client is None
         client = self.client or httpx.AsyncClient(base_url=self.base_url, timeout=20, follow_redirects=False)
         inserted = 0
@@ -115,12 +130,16 @@ class Collector:
         self.running = True
         while True:
             try:
-                await self.collect_once(refresh_metadata=first, max_pages=self.catchup_pages,
-                                        write_pause_seconds=self.write_pause_seconds)
-                self.last_wal_checkpoint = await asyncio.to_thread(self.store.checkpoint_wal)
+                result = await self.collect_once(refresh_metadata=first, max_pages=self.catchup_pages,
+                                                 write_pause_seconds=self.write_pause_seconds)
+                if not result.get("paused_for_storage"):
+                    self.last_wal_checkpoint = await asyncio.to_thread(self.store.checkpoint_wal)
                 first = False
-                self.last_success_at = datetime.now(UTC).isoformat()
-                self.last_error = None
+                if result.get("paused_for_storage"):
+                    self.last_error = "storage capacity critical; collection paused without deleting evidence"
+                else:
+                    self.last_success_at = datetime.now(UTC).isoformat()
+                    self.last_error = None
             except (httpx.HTTPError, ValueError, RuntimeError) as exc:
                 # The next loop retries from the persisted cursor; no cursor is advanced on failure.
                 self.last_error = f"{type(exc).__name__}: {exc}"
@@ -134,5 +153,7 @@ class Collector:
                 "write_batch_size": self.write_batch_size,
                 "write_pause_seconds": self.write_pause_seconds,
                 "last_wal_checkpoint": self.last_wal_checkpoint,
+                "storage_state": self.storage_state,
+                "paused_for_storage": self.paused_for_storage,
                 "gap_count": gap_count, "gaps": self.store.gaps(self.room, limit=20),
                 "gaps_truncated": gap_count > 20}

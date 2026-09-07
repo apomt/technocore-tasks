@@ -17,6 +17,15 @@ class Settings:
     mode: str = "hosted"
     collector_enabled: bool = True
     poll_seconds: float = 10.0
+    storage_warning_percent: float = 80.0
+    storage_urgent_percent: float = 90.0
+    storage_critical_percent: float = 95.0
+
+    def storage_thresholds(self) -> tuple[float, float, float]:
+        values = (self.storage_warning_percent, self.storage_urgent_percent, self.storage_critical_percent)
+        if not (0 < values[0] < values[1] < values[2] <= 100):
+            raise ValueError("storage thresholds must satisfy 0 < warning < urgent < critical <= 100")
+        return values
 
     @property
     def room(self) -> str:
@@ -37,7 +46,7 @@ class Settings:
             raise ValueError("private p-* rooms are forbidden")
         if any(not ROOM_RE.fullmatch(room) for room in (*rooms, signing_room)):
             raise ValueError("room names must match ^[a-z0-9][a-z0-9_-]{0,47}$")
-        return cls(
+        settings = cls(
             database=Path(os.getenv("TASKS_DATABASE", "technocore_tasks.db")),
             source_rooms=rooms,
             signing_room=signing_room,
@@ -45,4 +54,9 @@ class Settings:
             mode=mode,
             collector_enabled=os.getenv("TASKS_COLLECTOR_ENABLED", "1") == "1",
             poll_seconds=max(1.0, float(os.getenv("TASKS_POLL_SECONDS", "10"))),
+            storage_warning_percent=float(os.getenv("TASKS_STORAGE_WARNING_PERCENT", "80")),
+            storage_urgent_percent=float(os.getenv("TASKS_STORAGE_URGENT_PERCENT", "90")),
+            storage_critical_percent=float(os.getenv("TASKS_STORAGE_CRITICAL_PERCENT", "95")),
         )
+        settings.storage_thresholds()
+        return settings
