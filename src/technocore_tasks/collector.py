@@ -32,7 +32,7 @@ class Collector:
         self.sleeper = sleeper
         self.page_size = 200
         self.catchup_pages = 5
-        self.write_batch_size = 5
+        self.write_batch_size = 1
         self.write_pause_seconds = 0.05
         self.running = False
         self.last_success_at: str | None = None
