@@ -36,6 +36,7 @@ HTTP-readable with top-level `status=degraded`. Collection resumes automatically
 makes sufficient capacity available. Unavailable filesystem metrics are surfaced as `unavailable`
 and do not pause collection because an unknown measurement is not evidence that the volume is full.
 
-During catch-up, the collector also performs a passive WAL checkpoint every 25 observations and at
-the end of a partial page. This bounds transient WAL growth without truncating SQLite, deleting WAL
-evidence before it is checkpointed, or advancing the cursor early.
+During catch-up, the collector also performs a bounded-wait restart checkpoint every 25 observations
+and at the end of a partial page. Restart checkpoints reuse the existing WAL allocation; they do not
+truncate SQLite or the WAL. This bounds transient WAL growth without deleting evidence before it is
+checkpointed or advancing the cursor early. A busy reader causes a safe retry at the next interval.

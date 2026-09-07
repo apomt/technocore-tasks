@@ -111,7 +111,7 @@ class Collector:
                     inserted += await asyncio.to_thread(self.store.insert_messages, self.room, batch)
                     processed += len(batch)
                     if processed % self.wal_checkpoint_interval == 0:
-                        self.last_wal_checkpoint = await asyncio.to_thread(self.store.checkpoint_wal)
+                        self.last_wal_checkpoint = await asyncio.to_thread(self.store.checkpoint_wal, True)
                         storage = await asyncio.to_thread(self.store.storage_health, *self.storage_thresholds)
                         self.storage_state = storage["state"]
                         if (self.pause_on_critical_storage and storage["available"]
@@ -123,7 +123,7 @@ class Collector:
                     if write_pause_seconds:
                         await asyncio.sleep(write_pause_seconds)
                 if messages and processed % self.wal_checkpoint_interval:
-                    self.last_wal_checkpoint = await asyncio.to_thread(self.store.checkpoint_wal)
+                    self.last_wal_checkpoint = await asyncio.to_thread(self.store.checkpoint_wal, True)
                 new_cursor = int(payload.get("last_seq", cursor))
                 if new_cursor < cursor:
                     raise RuntimeError("Technocore cursor moved backwards")

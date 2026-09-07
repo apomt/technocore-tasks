@@ -577,10 +577,13 @@ class Store:
             "destructive_cleanup_enabled": False,
         }
 
-    def checkpoint_wal(self) -> dict[str, int]:
+    def checkpoint_wal(self, restart: bool = False) -> dict[str, int | str]:
         with self.connect() as db:
-            busy, log_pages, checkpointed_pages = db.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
-        result = {"busy": int(busy), "log_pages": int(log_pages),
+            if restart:
+                db.execute("PRAGMA busy_timeout=1000")
+            mode = "RESTART" if restart else "PASSIVE"
+            busy, log_pages, checkpointed_pages = db.execute(f"PRAGMA wal_checkpoint({mode})").fetchone()
+        result = {"mode": mode.lower(), "busy": int(busy), "log_pages": int(log_pages),
                   "checkpointed_pages": int(checkpointed_pages)}
         if not result["busy"]:
             self.last_successful_wal_checkpoint_at = datetime.now(UTC).isoformat()

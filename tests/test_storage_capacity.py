@@ -120,10 +120,13 @@ async def test_catchup_checkpoints_large_wal_within_a_page(store, dids, monkeypa
     checkpoints = 0
     original = store.checkpoint_wal
 
-    def checkpoint():
+    restart_modes = []
+
+    def checkpoint(restart=False):
         nonlocal checkpoints
         checkpoints += 1
-        return original()
+        restart_modes.append(restart)
+        return original(restart)
 
     monkeypatch.setattr(store, "checkpoint_wal", checkpoint)
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="https://example.test") as client:
@@ -132,6 +135,7 @@ async def test_catchup_checkpoints_large_wal_within_a_page(store, dids, monkeypa
 
     assert result["inserted"] == 30
     assert checkpoints == 2
+    assert restart_modes == [True, True]
 
 
 def test_storage_diagnostics_never_invoke_destructive_file_operations(tmp_path, monkeypatch):

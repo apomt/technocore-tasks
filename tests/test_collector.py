@@ -115,6 +115,7 @@ def test_page_insert_is_atomic_and_idempotent(store, dids):
     assert collector.write_pause_seconds == 0.05
     assert collector.wal_checkpoint_interval == 25
     assert store.checkpoint_wal()["busy"] == 0
+    assert store.checkpoint_wal(restart=True)["mode"] == "restart"
 
 
 @pytest.mark.asyncio
