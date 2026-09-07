@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import asyncio
+import time
 
 import httpx
 import pytest
@@ -107,6 +109,29 @@ def test_page_insert_is_atomic_and_idempotent(store, dids):
     assert store.insert_messages("technocore-tasks", messages) == 200
     assert store.insert_messages("technocore-tasks", messages) == 0
     assert store.counts()["observations"] == 200
+
+
+@pytest.mark.asyncio
+async def test_sqlite_page_write_does_not_block_event_loop(store, dids, monkeypatch):
+    task_id = "task-a83fd2c9"
+
+    def handler(request):
+        msg = message(1, dids[1], task_id)
+        return httpx.Response(200, json={"room": "technocore-tasks", "count": 1,
+                                        "first_seq": 1, "last_seq": 1, "messages": [msg]})
+
+    original = store.insert_messages
+    def slow_insert(room, messages):
+        time.sleep(0.1)
+        return original(room, messages)
+    monkeypatch.setattr(store, "insert_messages", slow_insert)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="https://technocore.chat") as client:
+        collector = Collector(store, "https://technocore.chat", "technocore-tasks", client=client)
+        started = time.perf_counter()
+        task = asyncio.create_task(collector.collect_once(refresh_metadata=False, max_pages=1))
+        await asyncio.sleep(0.02)
+        assert time.perf_counter() - started < 0.08
+        await task
 
 
 @pytest.mark.asyncio

@@ -45,9 +45,9 @@ class Collector:
         except (KeyError, StopIteration, TypeError):
             pass
         self.page_size = max(1, min(200, int(maximum)))
-        self.store.save_metadata("agent", agent)
-        self.store.save_metadata("openapi_info", spec.get("info", {}))
-        self.store.save_metadata("collector_page_size", self.page_size)
+        await asyncio.to_thread(self.store.save_metadata, "agent", agent)
+        await asyncio.to_thread(self.store.save_metadata, "openapi_info", spec.get("info", {}))
+        await asyncio.to_thread(self.store.save_metadata, "collector_page_size", self.page_size)
 
     @staticmethod
     def _retry_after(response: httpx.Response) -> float:
@@ -78,23 +78,25 @@ class Collector:
             if refresh_metadata:
                 await self.refresh_metadata(client)
             while pages < max_pages:
-                cursor = self.store.cursor(self.room)
+                cursor = await asyncio.to_thread(self.store.cursor, self.room)
                 payload = await self._get_page(client, cursor)
                 messages = payload.get("messages", [])
                 first_seq = payload.get("first_seq")
                 if first_seq is not None and int(first_seq) > cursor + 1:
-                    self.store.record_gap(self.room, cursor + 1, int(first_seq) - 1)
-                inserted += self.store.insert_messages(self.room, messages)
+                    await asyncio.to_thread(self.store.record_gap, self.room, cursor + 1, int(first_seq) - 1)
+                inserted += await asyncio.to_thread(self.store.insert_messages, self.room, messages)
                 new_cursor = int(payload.get("last_seq", cursor))
                 if new_cursor < cursor:
                     raise RuntimeError("Technocore cursor moved backwards")
                 if messages and new_cursor != int(messages[-1]["seq"]):
                     raise RuntimeError("Technocore cursor does not match the last returned message")
-                self.store.set_cursor(self.room, new_cursor)
+                await asyncio.to_thread(self.store.set_cursor, self.room, new_cursor)
                 pages += 1
                 if not messages or len(messages) < self.page_size or new_cursor == cursor:
                     break
-            return {"pages": pages, "inserted": inserted, "cursor": self.store.cursor(self.room), "gaps": self.store.gaps(self.room)}
+            cursor = await asyncio.to_thread(self.store.cursor, self.room)
+            gaps = await asyncio.to_thread(self.store.gaps, self.room)
+            return {"pages": pages, "inserted": inserted, "cursor": cursor, "gaps": gaps}
         finally:
             if owns_client:
                 await client.aclose()

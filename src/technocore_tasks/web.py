@@ -74,8 +74,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
 
     @app.get("/", response_class=HTMLResponse)
-    async def home(request: Request, q: str = Query("", max_length=300), protocol: str | None = None,
-                   page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200)):
+    def home(request: Request, q: str = Query("", max_length=300), protocol: str | None = None,
+             page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200)):
         tasks, pagination = board.search_page(q, protocol=protocol, page=page, page_size=page_size)
         sections = {
             "Open work": [t for t in tasks if t.normalized_state == "open"],
@@ -91,23 +91,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     maintenance=store.maintenance_status()))
 
     @app.get("/task/{task_id}", response_class=HTMLResponse)
-    async def task_detail(request: Request, task_id: str, page: int = Query(1, ge=1),
-                          page_size: int = Query(50, ge=1, le=200)):
+    def task_detail(request: Request, task_id: str, page: int = Query(1, ge=1),
+                    page_size: int = Query(50, ge=1, le=200)):
         if not WORK_ID_RE.fullmatch(task_id) or (task := board.task(task_id, page=page, page_size=page_size)) is None:
             raise HTTPException(404)
         return templates.TemplateResponse(request, "task.html", context(request, task=task))
 
     @app.get("/ecosystem", response_class=HTMLResponse)
-    async def ecosystem(request: Request):
+    def ecosystem(request: Request):
         return templates.TemplateResponse(request, "ecosystem.html", context(request))
 
     @app.get("/protocols", response_class=HTMLResponse)
-    async def protocols(request: Request):
+    def protocols(request: Request):
         return templates.TemplateResponse(request, "protocols.html",
                                           context(request, protocols=protocol_catalog()))
 
     @app.get("/health")
-    async def health():
+    def health():
         database = store.database_health()
         maintenance = store.maintenance_status()
         return {"status": "ok" if database["available"] else "degraded", "mode": settings.mode,
@@ -115,34 +115,34 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "maintenance": maintenance, "collectors": [collector.diagnostics() for collector in collectors]}
 
     @app.get("/api/tasks")
-    async def api_tasks(q: str = Query("", max_length=300), state: str | None = None,
-                        protocol: str | None = None, page: int = Query(1, ge=1),
-                        page_size: int = Query(50, ge=1, le=200)):
+    def api_tasks(q: str = Query("", max_length=300), state: str | None = None,
+                  protocol: str | None = None, page: int = Query(1, ge=1),
+                  page_size: int = Query(50, ge=1, le=200)):
         tasks, pagination = board.search_page(q, state, protocol, page, page_size)
         return {"tasks": [task.to_dict(detail=False) for task in tasks], "pagination": pagination}
 
     @app.get("/api/tasks/{task_id}")
-    async def api_task(task_id: str, protocol: str | None = None, page: int = Query(1, ge=1),
-                       page_size: int = Query(50, ge=1, le=200)):
+    def api_task(task_id: str, protocol: str | None = None, page: int = Query(1, ge=1),
+                 page_size: int = Query(50, ge=1, le=200)):
         if not WORK_ID_RE.fullmatch(task_id) or (task := board.task(task_id, protocol, page, page_size)) is None:
             raise HTTPException(404)
         return task.to_dict(detail=True)
 
     @app.get("/api/did/{did}/tasks")
-    async def api_did_tasks(did: str, page: int = Query(1, ge=1),
-                            page_size: int = Query(50, ge=1, le=200)):
+    def api_did_tasks(did: str, page: int = Query(1, ge=1),
+                      page_size: int = Query(50, ge=1, le=200)):
         if not DID_RE.fullmatch(did):
             raise HTTPException(404)
         tasks, pagination = board.did_tasks_page(did, page, page_size)
         return {"did": did, "tasks": [task.to_dict(detail=False) for task in tasks], "pagination": pagination}
 
     @app.get("/api/stats")
-    async def api_stats():
+    def api_stats():
         return {**board.stats(), "maintenance": store.maintenance_status(),
                 "collectors": [collector.diagnostics() for collector in collectors]}
 
     @app.get("/api/protocols")
-    async def api_protocols():
+    def api_protocols():
         return {"protocols": protocol_catalog()}
 
     return app
