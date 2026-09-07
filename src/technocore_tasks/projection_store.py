@@ -342,24 +342,36 @@ class Store:
         if reason and reason != "partial history: valid CREATE was not observed":
             self._conflict(db, key, row["seq"], kind, reason)
 
-    def insert_message(self, room: str, message: dict) -> bool:
-        text = str(message.get("text", ""))
-        adapter, parsed, error = detect_and_parse(text)
+    @staticmethod
+    def _message_values(room: str, message: dict) -> tuple:
+        text = str(message.get("text", "")); adapter, parsed, error = detect_and_parse(text)
         signer, nonce = message.get("from"), message.get("nonce")
         signed = bool(isinstance(signer, str) and DID_RE.fullmatch(signer) and isinstance(nonce, int))
+        return (room, int(message["seq"]), str(message["ts"]), str(signer) if signer is not None else None,
+                int(nonce) if isinstance(nonce, int) else None, text, int(signed),
+                adapter.protocol_name if adapter else None, adapter.protocol_version if adapter else None,
+                parsed.event_kind if parsed else None, parsed.task_id if parsed else None,
+                json.dumps(parsed.fields, ensure_ascii=False, separators=(",", ":")) if parsed else None, error)
+
+    def insert_messages(self, room: str, messages: list[dict]) -> int:
+        inserted = 0
         with self.connect() as db:
-            cur = db.execute("""INSERT OR IGNORE INTO observations
-                (room,seq,timestamp,signer_did,nonce,original_message,signed,protocol_name,protocol_version,
-                 event_kind,task_id,fields_json,parse_error) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (room, int(message["seq"]), str(message["ts"]), str(signer) if signer is not None else None,
-                 int(nonce) if isinstance(nonce, int) else None, text, int(signed),
-                 adapter.protocol_name if adapter else None, adapter.protocol_version if adapter else None,
-                 parsed.event_kind if parsed else None, parsed.task_id if parsed else None,
-                 json.dumps(parsed.fields, ensure_ascii=False, separators=(",", ":")) if parsed else None, error))
-            if cur.rowcount and self._get(db, "projection_status") == "complete":
-                row = db.execute("SELECT rowid,* FROM observations WHERE room=? AND seq=?", (room, int(message["seq"]))).fetchone()
-                self._apply_projection(db, row)
-            return cur.rowcount == 1
+            projected = self._get(db, "projection_status") == "complete"
+            for message in messages:
+                cur = db.execute("""INSERT OR IGNORE INTO observations
+                    (room,seq,timestamp,signer_did,nonce,original_message,signed,protocol_name,protocol_version,
+                     event_kind,task_id,fields_json,parse_error) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    self._message_values(room, message))
+                if cur.rowcount:
+                    inserted += 1
+                    if projected:
+                        row = db.execute("SELECT rowid,* FROM observations WHERE room=? AND seq=?",
+                                         (room, int(message["seq"]))).fetchone()
+                        self._apply_projection(db, row)
+        return inserted
+
+    def insert_message(self, room: str, message: dict) -> bool:
+        return self.insert_messages(room, [message]) == 1
 
     @staticmethod
     def _page(page: int, size: int, total: int) -> dict:
@@ -484,6 +496,12 @@ class Store:
             partial = int(db.execute("SELECT COUNT(*) FROM task_projections WHERE partial_history=1").fetchone()[0])
         return {"tasks": total, "native_states": native, "states": native, "protocols": protocols,
                 "conflicted": conflicted, "partial_history": partial}
+
+    def collection_summary(self) -> dict[str, int]:
+        with self.connect() as db:
+            row = db.execute("""SELECT COUNT(*) total_jobs,
+                              COALESCE(SUM(partial_history),0) partial_jobs FROM task_projections""").fetchone()
+        return {"total_jobs": int(row["total_jobs"]), "partial_jobs": int(row["partial_jobs"])}
 
     def database_health(self) -> dict:
         try:

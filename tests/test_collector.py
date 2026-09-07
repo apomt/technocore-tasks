@@ -101,6 +101,14 @@ async def test_duplicate_insert_is_idempotent(store, dids):
     assert store.counts()["observations"] == 1
 
 
+def test_page_insert_is_atomic_and_idempotent(store, dids):
+    task_id = "task-a83fd2c9"
+    messages = [message(seq, dids[1], task_id) for seq in range(1, 201)]
+    assert store.insert_messages("technocore-tasks", messages) == 200
+    assert store.insert_messages("technocore-tasks", messages) == 0
+    assert store.counts()["observations"] == 200
+
+
 @pytest.mark.asyncio
 async def test_collector_never_enumerates_rooms_or_private_resources(store):
     paths = []

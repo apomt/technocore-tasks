@@ -64,11 +64,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"request": request, "version": __version__, "rooms": settings.source_rooms, **extra}
 
     def collection_history() -> dict:
-        stats = store.projection_stats()
+        summary = store.collection_summary()
         gaps = store.gaps()
         return {
-            "total_jobs": stats["tasks"],
-            "partial_jobs": stats["partial_history"],
+            **summary,
             "gaps": gaps,
             "gap_count": store.gap_count(),
             "has_unrecoverable_gap": bool(gaps),

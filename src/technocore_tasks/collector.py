@@ -84,8 +84,7 @@ class Collector:
                 first_seq = payload.get("first_seq")
                 if first_seq is not None and int(first_seq) > cursor + 1:
                     self.store.record_gap(self.room, cursor + 1, int(first_seq) - 1)
-                for message in messages:
-                    inserted += int(self.store.insert_message(self.room, message))
+                inserted += self.store.insert_messages(self.room, messages)
                 new_cursor = int(payload.get("last_seq", cursor))
                 if new_cursor < cursor:
                     raise RuntimeError("Technocore cursor moved backwards")
