@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+from datetime import UTC, datetime
 from collections.abc import Awaitable, Callable
 
 import httpx
@@ -30,6 +31,9 @@ class Collector:
         self.client = client
         self.sleeper = sleeper
         self.page_size = 200
+        self.running = False
+        self.last_success_at: str | None = None
+        self.last_error: str | None = None
 
     async def refresh_metadata(self, client: httpx.AsyncClient) -> None:
         agent = (await client.get("/.well-known/agent.json")).raise_for_status().json()
@@ -98,11 +102,19 @@ class Collector:
 
     async def run_forever(self, poll_seconds: float = 10.0) -> None:
         first = True
+        self.running = True
         while True:
             try:
                 await self.collect_once(refresh_metadata=first)
                 first = False
-            except (httpx.HTTPError, ValueError, RuntimeError):
+                self.last_success_at = datetime.now(UTC).isoformat()
+                self.last_error = None
+            except (httpx.HTTPError, ValueError, RuntimeError) as exc:
                 # The next loop retries from the persisted cursor; no cursor is advanced on failure.
-                pass
+                self.last_error = f"{type(exc).__name__}: {exc}"
             await self.sleeper(poll_seconds)
+
+    def diagnostics(self) -> dict:
+        return {"room": self.room, "running": self.running, "cursor": self.store.cursor(self.room),
+                "last_success_at": self.last_success_at, "last_error": self.last_error,
+                "gaps": self.store.gaps(self.room)}

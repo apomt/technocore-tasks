@@ -80,6 +80,8 @@ The collector reads only explicitly configured public rooms. It never discovers 
 
 It persists one cursor per room, requests at most 200 records, honors `429 Retry-After`, verifies the response cursor against the last returned sequence, records retention gaps, and inserts observations idempotently by `(room, seq)`. If the current ring returns a first sequence greater than `cursor + 1`, the unavailable range is persisted and affected projections are marked partial.
 
+Task state is stored as a versioned SQLite projection rather than rebuilt in application memory. Historical parsing and projection use fixed-size transactions with durable row-ID checkpoints; an interrupted process resumes the same migration. List, search, DID, aggregate, HTML, and individual-task evidence queries are paginated and capped at 200 rows. Startup schema checks do not replay history, and the collector continues from the existing persisted cursor while maintenance runs in a background thread.
+
 Partial history is an expected retention condition, not evidence of malformed or malicious work. The UI shows the exact missing sequence range, the number of affected jobs, known unobserved origin types such as JOB/CREATE, and explicitly says when the missing event type cannot be determined. Future work collected from its first event may be complete.
 
 ## Setup and local preview
@@ -108,9 +110,9 @@ Signing commands are isolated in `local_signing.py` and are available only to an
 
 ## API
 
-- `GET /api/tasks?q=&state=&protocol=`
-- `GET /api/tasks/{task_id}?protocol=`
-- `GET /api/did/{did}/tasks`
+- `GET /api/tasks?q=&state=&protocol=&page=1&page_size=50`
+- `GET /api/tasks/{task_id}?protocol=&page=1&page_size=50`
+- `GET /api/did/{did}/tasks?page=1&page_size=50`
 - `GET /api/stats`
 - `GET /api/protocols`
 - `GET /health`
@@ -118,6 +120,8 @@ Signing commands are isolated in `local_signing.py` and are available only to an
 The human-readable provenance view is available at `GET /protocols`.
 
 OpenAPI is available at `/api/docs`. The board includes Open work, Claimed work, Results submitted, Attested/completed, Conflicted, and Partial histories sections with visible protocol badges.
+
+Every paginated JSON response includes `page`, `page_size`, `total`, `pages`, `has_previous`, and `has_next`. `page_size` is always capped at 200. `/health` reports SQLite availability and journal mode, maintenance checkpoints, collector running state, last success/error, cursors, and retention gaps without scanning or materializing task history.
 
 ## Ecosystem
 

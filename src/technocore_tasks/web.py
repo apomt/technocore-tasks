@@ -29,9 +29,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        tasks = []
+        tasks = [asyncio.create_task(asyncio.to_thread(store.run_maintenance, 5000))]
         if settings.collector_enabled:
-            tasks = [asyncio.create_task(c.run_forever(settings.poll_seconds)) for c in collectors]
+            tasks.extend(asyncio.create_task(c.run_forever(settings.poll_seconds)) for c in collectors)
         yield
         for task in tasks:
             task.cancel()
@@ -64,18 +64,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"request": request, "version": __version__, "rooms": settings.source_rooms, **extra}
 
     def collection_history() -> dict:
-        all_tasks = board.all_tasks()
+        stats = store.projection_stats()
         gaps = store.gaps()
         return {
-            "total_jobs": len(all_tasks),
-            "partial_jobs": sum(task.partial_history for task in all_tasks),
+            "total_jobs": stats["tasks"],
+            "partial_jobs": stats["partial_history"],
             "gaps": gaps,
             "has_unrecoverable_gap": bool(gaps),
         }
 
     @app.get("/", response_class=HTMLResponse)
-    async def home(request: Request, q: str = Query("", max_length=300), protocol: str | None = None):
-        tasks = board.search(q, protocol=protocol)
+    async def home(request: Request, q: str = Query("", max_length=300), protocol: str | None = None,
+                   page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200)):
+        tasks, pagination = board.search_page(q, protocol=protocol, page=page, page_size=page_size)
         sections = {
             "Open work": [t for t in tasks if t.normalized_state == "open"],
             "Claimed work": [t for t in tasks if t.normalized_state == "claimed"],
@@ -86,11 +87,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
         return templates.TemplateResponse(request, "home.html",
             context(request, sections=sections, query=q, selected_protocol=protocol or "",
-                    collection_history=collection_history()))
+                    collection_history=collection_history(), pagination=pagination,
+                    maintenance=store.maintenance_status()))
 
     @app.get("/task/{task_id}", response_class=HTMLResponse)
-    async def task_detail(request: Request, task_id: str):
-        if not WORK_ID_RE.fullmatch(task_id) or (task := board.task(task_id)) is None:
+    async def task_detail(request: Request, task_id: str, page: int = Query(1, ge=1),
+                          page_size: int = Query(50, ge=1, le=200)):
+        if not WORK_ID_RE.fullmatch(task_id) or (task := board.task(task_id, page=page, page_size=page_size)) is None:
             raise HTTPException(404)
         return templates.TemplateResponse(request, "task.html", context(request, task=task))
 
@@ -105,31 +108,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health")
     async def health():
-        return {"status": "ok", "mode": settings.mode, "signing": False, "source_rooms": settings.source_rooms}
+        database = store.database_health()
+        maintenance = store.maintenance_status()
+        return {"status": "ok" if database["available"] else "degraded", "mode": settings.mode,
+                "signing": False, "source_rooms": settings.source_rooms, "database": database,
+                "maintenance": maintenance, "collectors": [collector.diagnostics() for collector in collectors]}
 
     @app.get("/api/tasks")
     async def api_tasks(q: str = Query("", max_length=300), state: str | None = None,
-                        protocol: str | None = None):
-        return {"tasks": [task.to_dict(detail=False) for task in board.search(q, state, protocol)]}
+                        protocol: str | None = None, page: int = Query(1, ge=1),
+                        page_size: int = Query(50, ge=1, le=200)):
+        tasks, pagination = board.search_page(q, state, protocol, page, page_size)
+        return {"tasks": [task.to_dict(detail=False) for task in tasks], "pagination": pagination}
 
     @app.get("/api/tasks/{task_id}")
-    async def api_task(task_id: str, protocol: str | None = None):
-        if not WORK_ID_RE.fullmatch(task_id) or (task := board.task(task_id, protocol)) is None:
+    async def api_task(task_id: str, protocol: str | None = None, page: int = Query(1, ge=1),
+                       page_size: int = Query(50, ge=1, le=200)):
+        if not WORK_ID_RE.fullmatch(task_id) or (task := board.task(task_id, protocol, page, page_size)) is None:
             raise HTTPException(404)
         return task.to_dict(detail=True)
 
     @app.get("/api/did/{did}/tasks")
-    async def api_did_tasks(did: str):
+    async def api_did_tasks(did: str, page: int = Query(1, ge=1),
+                            page_size: int = Query(50, ge=1, le=200)):
         if not DID_RE.fullmatch(did):
             raise HTTPException(404)
-        return {"did": did, "tasks": [task.to_dict(detail=False) for task in board.did_tasks(did)]}
+        tasks, pagination = board.did_tasks_page(did, page, page_size)
+        return {"did": did, "tasks": [task.to_dict(detail=False) for task in tasks], "pagination": pagination}
 
     @app.get("/api/stats")
     async def api_stats():
-        return {**board.stats(), "collectors": [
-            {"room": room, "cursor": store.cursor(room), "gaps": store.gaps(room)}
-            for room in settings.source_rooms
-        ]}
+        return {**board.stats(), "maintenance": store.maintenance_status(),
+                "collectors": [collector.diagnostics() for collector in collectors]}
 
     @app.get("/api/protocols")
     async def api_protocols():

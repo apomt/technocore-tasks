@@ -17,3 +17,5 @@ htmlcov/
 *.log
 pip-wheel-metadata/
 node_modules/
+backups/
+.ops-ssh-temp/

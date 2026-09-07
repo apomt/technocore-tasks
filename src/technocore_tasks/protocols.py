@@ -43,10 +43,18 @@ class TaskRecord:
     conflicts: list[dict] = field(default_factory=list)
     advertised: dict[str, str] = field(default_factory=dict)
     partial_history: bool = False
+    projected_conflict_count: int = 0
+    projected_event_count: int = 0
+    projected_claim_count: int = 0
+    projected_result_count: int = 0
+    projected_attestation_count: int = 0
+    projected_event_types: list[str] = field(default_factory=list)
+    event_pagination: dict = field(default_factory=dict)
+    conflict_pagination: dict = field(default_factory=dict)
 
     @property
     def conflicted(self) -> bool:
-        return bool(self.conflicts)
+        return bool(self.projected_conflict_count or self.conflicts)
 
     @property
     def missing_event_types(self) -> list[str]:
@@ -61,7 +69,7 @@ class TaskRecord:
 
     @property
     def observed_event_types(self) -> list[str]:
-        return list(dict.fromkeys(event["event_kind"] for event in self.events))
+        return self.projected_event_types or list(dict.fromkeys(event["event_kind"] for event in self.events))
 
     def to_dict(self, detail: bool = True) -> dict:
         signed_events = [evidence(event) for event in self.events if event.get("signed")]
@@ -90,6 +98,7 @@ class TaskRecord:
             "missing_event_types_unknown": self.missing_event_types_unknown,
             "observed_event_types": self.observed_event_types,
             "conflicts": deepcopy(self.conflicts),
+            "conflict_count": self.projected_conflict_count or len(self.conflicts),
             "observed_signed_facts": signed_facts,
             "observed_signed_events": signed_events,
             "advertised_unverified_fields": deepcopy(self.advertised),
@@ -97,7 +106,10 @@ class TaskRecord:
                 "state": self.state,
                 "normalized_state": self.normalized_state,
                 "assignee_did": self.assignee_did,
-                "claim_count": len(self.claims),
+                "claim_count": self.projected_claim_count or len(self.claims),
+                "event_count": self.projected_event_count or len(self.events),
+                "result_count": self.projected_result_count or len(self.results),
+                "attestation_count": self.projected_attestation_count or len(self.attestations),
                 "partial_history": self.partial_history,
                 "conflicted": self.conflicted,
             },
@@ -114,6 +126,8 @@ class TaskRecord:
                 ]
                 timeline.append(item)
             data["event_timeline"] = timeline
+            data["event_pagination"] = deepcopy(self.event_pagination)
+            data["conflict_pagination"] = deepcopy(self.conflict_pagination)
         return data
 
 

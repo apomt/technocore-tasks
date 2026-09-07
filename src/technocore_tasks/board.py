@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections import defaultdict
+import json
 
-from .protocols import ADAPTER_BY_KEY, TaskRecord
+from .protocols import TaskRecord
 from .storage import Store
 
 Task = TaskRecord
@@ -12,50 +12,62 @@ class Board:
     def __init__(self, store: Store):
         self.store = store
 
-    def all_tasks(self) -> list[Task]:
-        grouped: dict[tuple[str, str, str, str], list[dict]] = defaultdict(list)
-        for event in self.store.events():
-            key = (event["protocol_name"], event["protocol_version"], event["room"], event["task_id"])
-            grouped[key].append(event)
-        tasks = []
-        for (protocol, version, room, task_id), events in grouped.items():
-            adapter = ADAPTER_BY_KEY[(protocol, version)]
-            tasks.append(adapter.reduce(task_id, room, events, bool(self.store.gaps(room))))
-        return sorted(tasks, key=lambda task: (task.created_at or "", task.task_id), reverse=True)
+    @staticmethod
+    def _task(row: dict) -> Task:
+        task = TaskRecord(
+            task_id=row["task_id"], protocol=row["protocol_name"],
+            protocol_version=row["protocol_version"], source_room=row["room"],
+            creator_did=row["creator_did"], title=row["title"], description=row["description"],
+            state=row["state"], normalized_state=row["normalized_state"], created_at=row["created_at"],
+            assignee_did=row["assignee_did"], advertised=json.loads(row["advertised_json"]),
+            partial_history=bool(row["partial_history"]),
+        )
+        task.projected_conflict_count = int(row["conflict_count"])
+        task.projected_event_count = int(row["event_count"])
+        task.projected_claim_count = int(row["claim_count"])
+        task.projected_result_count = int(row["result_count"])
+        task.projected_attestation_count = int(row["attestation_count"])
+        task.projected_event_types = json.loads(row["event_types_json"])
+        return task
 
-    def task(self, task_id: str, protocol: str | None = None) -> Task | None:
-        matches = [task for task in self.all_tasks() if task.task_id == task_id]
-        if protocol:
-            wanted = protocol.upper().replace("-V1", "").replace("/1", "")
-            matches = [task for task in matches if task.protocol == wanted]
-        return matches[0] if len(matches) == 1 else None
+    def search_page(self, query: str = "", state: str | None = None, protocol: str | None = None,
+                    page: int = 1, page_size: int = 50) -> tuple[list[Task], dict]:
+        rows, pagination = self.store.projection_rows(query, state, protocol, page=page, page_size=page_size)
+        return [self._task(row) for row in rows], pagination
 
-    def search(self, query: str = "", state: str | None = None, protocol: str | None = None) -> list[Task]:
-        needle = query.casefold().strip()
-        wanted = protocol.upper().replace("-V1", "").replace("/1", "") if protocol else None
-        result = []
-        for task in self.all_tasks():
-            if wanted and task.protocol != wanted:
-                continue
-            state_match = task.conflicted if state == "conflicted" else (
-                not state or task.state == state or task.normalized_state == state
-            )
-            participants = [event.get("signer_did") or "" for event in task.events]
-            haystack = "\n".join([task.task_id, task.protocol, task.source_room, task.creator_did or "",
-                                   task.title, task.description, task.assignee_did or "", *participants]).casefold()
-            if state_match and (not needle or needle in haystack):
-                result.append(task)
-        return result
+    def search(self, query: str = "", state: str | None = None, protocol: str | None = None,
+               page: int = 1, page_size: int = 50) -> list[Task]:
+        return self.search_page(query, state, protocol, page, page_size)[0]
 
-    def did_tasks(self, did: str) -> list[Task]:
-        return [task for task in self.all_tasks() if any(event.get("signer_did") == did for event in task.events)]
+    def all_tasks(self, page: int = 1, page_size: int = 50) -> list[Task]:
+        return self.search(page=page, page_size=page_size)
+
+    def task(self, task_id: str, protocol: str | None = None, page: int = 1,
+             page_size: int = 50) -> Task | None:
+        row = self.store.projection(task_id, protocol)
+        if row is None:
+            return None
+        task = self._task(row)
+        task.events, task.event_pagination = self.store.events(task_id, protocol, page, page_size, row["room"])
+        task.conflicts, task.conflict_pagination = self.store.conflicts(row, page, page_size)
+        task.claims = [event for event in task.events if event["event_kind"] == "CLAIM" and event["valid_transition"]]
+        task.results = [event for event in task.events if event["event_kind"] in {"RESULT", "DELIVER", "COMPLETE"}
+                        and event["valid_transition"]]
+        task.attestations = [event for event in task.events if event["event_kind"] == "ATTEST" and event["valid_transition"]]
+        valid = [event for event in task.events if event["valid_transition"]]
+        task.assignment = next((event for event in reversed(valid) if event["event_kind"] == "ASSIGN"), None)
+        task.completion = next((event for event in reversed(valid)
+                                if event["event_kind"] in {"COMPLETE", "RESULT", "DELIVER"}), None)
+        task.close_event = next((event for event in reversed(valid) if event["event_kind"] == "CLOSE"), None)
+        task.cancel_event = next((event for event in reversed(valid) if event["event_kind"] == "CANCEL"), None)
+        return task
+
+    def did_tasks_page(self, did: str, page: int = 1, page_size: int = 50) -> tuple[list[Task], dict]:
+        rows, pagination = self.store.projection_rows(did=did, page=page, page_size=page_size)
+        return [self._task(row) for row in rows], pagination
+
+    def did_tasks(self, did: str, page: int = 1, page_size: int = 50) -> list[Task]:
+        return self.did_tasks_page(did, page, page_size)[0]
 
     def stats(self) -> dict:
-        tasks = self.all_tasks()
-        native, protocols = defaultdict(int), defaultdict(int)
-        for task in tasks:
-            native[task.state] += 1
-            protocols[f"{task.protocol}-{task.protocol_version}"] += 1
-        return {"tasks": len(tasks), "native_states": dict(native), "states": dict(native),
-                "protocols": dict(protocols), "conflicted": sum(t.conflicted for t in tasks),
-                "partial_history": sum(t.partial_history for t in tasks), **self.store.counts()}
+        return {**self.store.projection_stats(), **self.store.counts()}

@@ -7,6 +7,8 @@
   <div class="status-strip"><span class="pulse"></span> Watching <code>{{ rooms|join(', ') }}</code> <span class="separator">/</span> No hosted writes</div>
 </section>
 
+{% if not maintenance.ready %}<section class="history-notice"><div><strong>Index maintenance in progress</strong><span>Historical events are being projected in bounded, resumable batches. Counts and results may grow until ready.</span></div></section>{% endif %}
+
 {% if collection_history.has_unrecoverable_gap %}
 <section class="history-notice" aria-label="Collection history">
   <div><strong>Collection history</strong><span>{{ collection_history.partial_jobs }} of {{ collection_history.total_jobs }} reconstructed jobs are marked partial.</span></div>
@@ -49,4 +51,9 @@
   </div>{% else %}<p class="empty">No matching work observed.</p>{% endif %}
 </section>
 {% endfor %}
+{% if pagination.pages > 1 %}<nav aria-label="Task pages">
+  {% if pagination.has_previous %}<a href="/?q={{ query|urlencode }}&protocol={{ selected_protocol|urlencode }}&page={{ pagination.page - 1 }}&page_size={{ pagination.page_size }}">← Previous</a>{% endif %}
+  <span>Page {{ pagination.page }} of {{ pagination.pages }} · {{ pagination.total }} matching tasks</span>
+  {% if pagination.has_next %}<a href="/?q={{ query|urlencode }}&protocol={{ selected_protocol|urlencode }}&page={{ pagination.page + 1 }}&page_size={{ pagination.page_size }}">Next →</a>{% endif %}
+</nav>{% endif %}
 {% endblock %}
