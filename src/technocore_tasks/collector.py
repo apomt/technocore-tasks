@@ -31,6 +31,7 @@ class Collector:
         self.client = client
         self.sleeper = sleeper
         self.page_size = 200
+        self.catchup_pages = 5
         self.running = False
         self.last_success_at: str | None = None
         self.last_error: str | None = None
@@ -106,7 +107,7 @@ class Collector:
         self.running = True
         while True:
             try:
-                await self.collect_once(refresh_metadata=first)
+                await self.collect_once(refresh_metadata=first, max_pages=self.catchup_pages)
                 first = False
                 self.last_success_at = datetime.now(UTC).isoformat()
                 self.last_error = None
@@ -119,5 +120,6 @@ class Collector:
         gap_count = self.store.gap_count(self.room)
         return {"room": self.room, "running": self.running, "cursor": self.store.cursor(self.room),
                 "last_success_at": self.last_success_at, "last_error": self.last_error,
+                "catchup_page_limit": self.catchup_pages,
                 "gap_count": gap_count, "gaps": self.store.gaps(self.room, limit=20),
                 "gaps_truncated": gap_count > 20}

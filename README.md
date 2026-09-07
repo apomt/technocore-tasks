@@ -80,6 +80,8 @@ The collector reads only explicitly configured public rooms. It never discovers 
 
 It persists one cursor per room, requests at most 200 records, honors `429 Retry-After`, verifies the response cursor against the last returned sequence, records retention gaps, and inserts observations idempotently by `(room, seq)`. If the current ring returns a first sequence greater than `cursor + 1`, the unavailable range is persisted and affected projections are marked partial.
 
+Each fetched page is committed atomically. The continuous collector processes at most five pages per poll cycle before yielding a read window, so a large catch-up cannot monopolize the single SQLite volume or the web event loop. A crash between the page commit and cursor update safely re-reads the same idempotent observations.
+
 Task state is stored as a versioned SQLite projection rather than rebuilt in application memory. Historical parsing and projection use fixed-size transactions with durable row-ID checkpoints; an interrupted process resumes the same migration. List, search, DID, aggregate, HTML, and individual-task evidence queries are paginated and capped at 200 rows. Startup schema checks do not replay history, and the collector continues from the existing persisted cursor while maintenance runs in a background thread.
 
 Partial history is an expected retention condition, not evidence of malformed or malicious work. The UI shows the exact missing sequence range, the number of affected jobs, known unobserved origin types such as JOB/CREATE, and explicitly says when the missing event type cannot be determined. Future work collected from its first event may be complete.
