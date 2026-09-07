@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Technocore Tasks tclk pilot benchmark result",
+  "type": "object",
+  "required": ["schema_version", "captured_at", "python", "platform", "memory_budget_mib", "before", "after", "invariants_preserved", "operations"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "captured_at": {"type": "string"},
+    "python": {"type": "string"},
+    "platform": {"type": "string"},
+    "memory_budget_mib": {"type": "integer", "minimum": 1},
+    "before": {"type": "object"},
+    "after": {"type": "object"},
+    "invariants_preserved": {"type": "boolean"},
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["operation", "outcome", "wall_seconds", "peak_rss_bytes", "peak_rss_mib"],
+        "properties": {
+          "operation": {"enum": ["startup", "homepage", "search", "stats", "task_detail", "api_detail"]},
+          "outcome": {"enum": ["ok", "memory_limit", "timeout", "error"]},
+          "wall_seconds": {"type": "number", "minimum": 0},
+          "peak_rss_bytes": {"type": "integer", "minimum": 0},
+          "peak_rss_mib": {"type": "number", "minimum": 0}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "status": "TEMPLATE_UNSIGNED_DO_NOT_POST",
+  "released_tclk_version": "v0.1.0",
+  "released_tclk_commit": "54e5caf03da76cd6c3d412ab840f543be018734b",
+  "target_room": "tclk-offers",
+  "builder": "docs/tclk-pilot/build_open_offer.py",
+  "required_inputs": {
+    "context_url": "<IMMUTABLE_PILOT_BRIEF_URL>",
+    "frame_nonce": "<FRESH_RANDOM_LOWERCASE_HEX_8_TO_64_CHARS>",
+    "now_ms": "<CURRENT_POSITIVE_UNIX_MS_INTEGER>",
+    "transport_nonce": "<INTEGER_STRICTLY_GREATER_THAN_LAST_DID_NONCE_IN_TCLK_OFFERS>"
+  },
+  "fixed_terms": {
+    "from": "did:key:z6MkimcfTzAFj18jNxxYEWenqwr59AEPCWYhvG4qC5WdzrXY",
+    "role": "payer",
+    "amount": "1",
+    "asset": "PAPER",
+    "lock": "hash",
+    "rails": ["paper"],
+    "job": {
+      "proto": "a2a",
+      "id": "technocore-tasks-v0211-validation"
+    }
+  },
+  "deadline_offsets_ms": {
+    "expiresMs": 86400000,
+    "claimByMs": 604800000,
+    "refundAfterMs": 691200000
+  },
+  "signature": null,
+  "posted": false
+}
