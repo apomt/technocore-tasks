@@ -111,7 +111,7 @@ def test_page_insert_is_atomic_and_idempotent(store, dids):
     assert store.counts()["observations"] == 200
     collector = Collector(store, "https://technocore.chat", "technocore-tasks")
     assert collector.catchup_pages == 5
-    assert collector.write_batch_size == 20
+    assert collector.write_batch_size == 5
     assert collector.write_pause_seconds == 0.05
 
 
