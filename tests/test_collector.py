@@ -109,7 +109,10 @@ def test_page_insert_is_atomic_and_idempotent(store, dids):
     assert store.insert_messages("technocore-tasks", messages) == 200
     assert store.insert_messages("technocore-tasks", messages) == 0
     assert store.counts()["observations"] == 200
-    assert Collector(store, "https://technocore.chat", "technocore-tasks").catchup_pages == 5
+    collector = Collector(store, "https://technocore.chat", "technocore-tasks")
+    assert collector.catchup_pages == 5
+    assert collector.write_batch_size == 20
+    assert collector.write_pause_seconds == 0.05
 
 
 @pytest.mark.asyncio

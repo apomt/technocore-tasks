@@ -32,6 +32,8 @@ class Collector:
         self.sleeper = sleeper
         self.page_size = 200
         self.catchup_pages = 5
+        self.write_batch_size = 20
+        self.write_pause_seconds = 0.05
         self.running = False
         self.last_success_at: str | None = None
         self.last_error: str | None = None
@@ -85,7 +87,10 @@ class Collector:
                 first_seq = payload.get("first_seq")
                 if first_seq is not None and int(first_seq) > cursor + 1:
                     await asyncio.to_thread(self.store.record_gap, self.room, cursor + 1, int(first_seq) - 1)
-                inserted += await asyncio.to_thread(self.store.insert_messages, self.room, messages)
+                for start in range(0, len(messages), self.write_batch_size):
+                    batch = messages[start:start + self.write_batch_size]
+                    inserted += await asyncio.to_thread(self.store.insert_messages, self.room, batch)
+                    await asyncio.sleep(self.write_pause_seconds)
                 new_cursor = int(payload.get("last_seq", cursor))
                 if new_cursor < cursor:
                     raise RuntimeError("Technocore cursor moved backwards")
@@ -121,5 +126,7 @@ class Collector:
         return {"room": self.room, "running": self.running, "cursor": self.store.cursor(self.room),
                 "last_success_at": self.last_success_at, "last_error": self.last_error,
                 "catchup_page_limit": self.catchup_pages,
+                "write_batch_size": self.write_batch_size,
+                "write_pause_seconds": self.write_pause_seconds,
                 "gap_count": gap_count, "gaps": self.store.gaps(self.room, limit=20),
                 "gaps_truncated": gap_count > 20}
