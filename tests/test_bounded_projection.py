@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import threading
+import time
+
 from fastapi.testclient import TestClient
 
 from technocore_tasks.board import Board
 from technocore_tasks.config import Settings
 from technocore_tasks.web import create_app
+from technocore_tasks.projection_store import IOGate
 
 from conftest import add_create, add_event
 
@@ -54,3 +58,26 @@ def test_api_exposes_pagination_and_maintenance_diagnostics(store, dids):
     assert health["maintenance"]["projection"]["cursor"] == health["maintenance"]["projection"]["maximum"]
     assert health["collectors"][0]["gap_count"] == 0
     assert health["signing"] is False
+
+
+def test_io_gate_prioritizes_a_queued_read_over_background_write():
+    gate, order = IOGate(), []
+    entered, release = threading.Event(), threading.Event()
+
+    def first_writer():
+        with gate.write():
+            entered.set(); release.wait(1)
+    def reader():
+        with gate.read(): order.append("read")
+    def second_writer():
+        with gate.write(): order.append("write")
+
+    threads = [threading.Thread(target=first_writer), threading.Thread(target=reader),
+               threading.Thread(target=second_writer)]
+    threads[0].start(); assert entered.wait(1)
+    threads[1].start()
+    deadline = time.time() + 1
+    while gate.waiting_readers == 0 and time.time() < deadline: time.sleep(0.001)
+    threads[2].start(); release.set()
+    for thread in threads: thread.join(1)
+    assert order == ["read", "write"]

@@ -16,6 +16,42 @@ DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 200
 
 
+class IOGate:
+    """Serialize broad reads/writes and let queued reads run before background writes."""
+    def __init__(self):
+        self.condition = threading.Condition()
+        self.active = False
+        self.waiting_readers = 0
+
+    @contextmanager
+    def read(self):
+        with self.condition:
+            self.waiting_readers += 1
+            while self.active:
+                self.condition.wait()
+            self.waiting_readers -= 1
+            self.active = True
+        try:
+            yield
+        finally:
+            with self.condition:
+                self.active = False
+                self.condition.notify_all()
+
+    @contextmanager
+    def write(self):
+        with self.condition:
+            while self.active or self.waiting_readers:
+                self.condition.wait()
+            self.active = True
+        try:
+            yield
+        finally:
+            with self.condition:
+                self.active = False
+                self.condition.notify_all()
+
+
 def normalize_protocol(value: str | None) -> str | None:
     return value.upper().replace("-V1", "").replace("/1", "") if value else None
 
@@ -23,7 +59,7 @@ def normalize_protocol(value: str | None) -> str | None:
 class Store:
     def __init__(self, path: str | Path):
         self.path = str(path)
-        self.io_gate = threading.Lock()
+        self.io_gate = IOGate()
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         self.initialize()
 
@@ -139,7 +175,7 @@ class Store:
 
     def maintenance_step(self, batch_size: int = 1000) -> dict:
         size = max(1, min(int(batch_size), 5000))
-        with self.io_gate, self.connect() as db:
+        with self.io_gate.write(), self.connect() as db:
             if self._get(db, "parse_status") != "complete":
                 cursor = int(self._get(db, "parse_cursor") or 0)
                 rows = db.execute("""SELECT rowid,room,seq,original_message FROM observations
@@ -357,7 +393,7 @@ class Store:
 
     def insert_messages(self, room: str, messages: list[dict]) -> int:
         inserted = 0
-        with self.io_gate, self.connect() as db:
+        with self.io_gate.write(), self.connect() as db:
             projected = self._get(db, "projection_status") == "complete"
             for message in messages:
                 cur = db.execute("""INSERT OR IGNORE INTO observations

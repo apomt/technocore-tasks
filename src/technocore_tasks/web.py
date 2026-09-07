@@ -77,7 +77,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     def home(request: Request, q: str = Query("", max_length=300), protocol: str | None = None,
              page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200)):
-        with broad_read_gate:
+        with broad_read_gate.read():
             tasks, pagination = board.search_page(q, protocol=protocol, page=page, page_size=page_size)
             sections = {
                 "Open work": [t for t in tasks if t.normalized_state == "open"],
@@ -120,7 +120,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def api_tasks(q: str = Query("", max_length=300), state: str | None = None,
                   protocol: str | None = None, page: int = Query(1, ge=1),
                   page_size: int = Query(50, ge=1, le=200)):
-        with broad_read_gate:
+        with broad_read_gate.read():
             tasks, pagination = board.search_page(q, state, protocol, page, page_size)
             return {"tasks": [task.to_dict(detail=False) for task in tasks], "pagination": pagination}
 
@@ -136,13 +136,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                       page_size: int = Query(50, ge=1, le=200)):
         if not DID_RE.fullmatch(did):
             raise HTTPException(404)
-        with broad_read_gate:
+        with broad_read_gate.read():
             tasks, pagination = board.did_tasks_page(did, page, page_size)
             return {"did": did, "tasks": [task.to_dict(detail=False) for task in tasks], "pagination": pagination}
 
     @app.get("/api/stats")
     def api_stats():
-        with broad_read_gate:
+        with broad_read_gate.read():
             return {**board.stats(), "maintenance": store.maintenance_status(),
                     "collectors": [collector.diagnostics() for collector in collectors]}
 
