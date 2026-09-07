@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import threading
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
@@ -27,7 +26,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     store = Store(settings.database)
     board = Board(store)
     collectors = [Collector(store, settings.base_url, room) for room in settings.source_rooms]
-    broad_read_gate = threading.Semaphore(1)
+    broad_read_gate = store.io_gate
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
@@ -22,6 +23,7 @@ def normalize_protocol(value: str | None) -> str | None:
 class Store:
     def __init__(self, path: str | Path):
         self.path = str(path)
+        self.io_gate = threading.Lock()
         Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         self.initialize()
 
@@ -137,7 +139,7 @@ class Store:
 
     def maintenance_step(self, batch_size: int = 1000) -> dict:
         size = max(1, min(int(batch_size), 5000))
-        with self.connect() as db:
+        with self.io_gate, self.connect() as db:
             if self._get(db, "parse_status") != "complete":
                 cursor = int(self._get(db, "parse_cursor") or 0)
                 rows = db.execute("""SELECT rowid,room,seq,original_message FROM observations
@@ -355,7 +357,7 @@ class Store:
 
     def insert_messages(self, room: str, messages: list[dict]) -> int:
         inserted = 0
-        with self.connect() as db:
+        with self.io_gate, self.connect() as db:
             projected = self._get(db, "projection_status") == "complete"
             for message in messages:
                 cur = db.execute("""INSERT OR IGNORE INTO observations

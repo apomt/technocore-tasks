@@ -125,7 +125,7 @@ OpenAPI is available at `/api/docs`. The board includes Open work, Claimed work,
 
 Every paginated JSON response includes `page`, `page_size`, `total`, `pages`, `has_previous`, and `has_next`. `page_size` is always capped at 200. `/health` reports SQLite availability and journal mode, maintenance checkpoints, collector running state, last success/error, cursors, and retention gaps without scanning or materializing task history.
 
-Broad index scans (homepage/search/DID/stats) share a one-at-a-time gate so concurrent requests queue instead of thrashing the single SQLite volume. Lightweight health and indexed task-detail reads do not use that gate.
+Broad index scans (homepage/search/DID/stats), projection batches, and collector write batches share a one-at-a-time disk gate so queued reads receive a quiet window instead of thrashing the single SQLite volume. Lightweight health and indexed task-detail reads do not use that gate.
 
 ## Ecosystem
 
