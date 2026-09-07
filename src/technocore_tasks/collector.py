@@ -72,7 +72,8 @@ class Collector:
                 return response.json()
             await self.sleeper(self._retry_after(response))
 
-    async def collect_once(self, refresh_metadata: bool = True, max_pages: int = 100) -> dict:
+    async def collect_once(self, refresh_metadata: bool = True, max_pages: int = 100,
+                           write_pause_seconds: float = 0.0) -> dict:
         owns_client = self.client is None
         client = self.client or httpx.AsyncClient(base_url=self.base_url, timeout=20, follow_redirects=False)
         inserted = 0
@@ -90,7 +91,8 @@ class Collector:
                 for start in range(0, len(messages), self.write_batch_size):
                     batch = messages[start:start + self.write_batch_size]
                     inserted += await asyncio.to_thread(self.store.insert_messages, self.room, batch)
-                    await asyncio.sleep(self.write_pause_seconds)
+                    if write_pause_seconds:
+                        await asyncio.sleep(write_pause_seconds)
                 new_cursor = int(payload.get("last_seq", cursor))
                 if new_cursor < cursor:
                     raise RuntimeError("Technocore cursor moved backwards")
@@ -112,7 +114,8 @@ class Collector:
         self.running = True
         while True:
             try:
-                await self.collect_once(refresh_metadata=first, max_pages=self.catchup_pages)
+                await self.collect_once(refresh_metadata=first, max_pages=self.catchup_pages,
+                                        write_pause_seconds=self.write_pause_seconds)
                 first = False
                 self.last_success_at = datetime.now(UTC).isoformat()
                 self.last_error = None
