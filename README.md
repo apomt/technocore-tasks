@@ -82,6 +82,8 @@ It persists one cursor per room, requests at most 200 records, honors `429 Retry
 
 Each fetched observation is persisted in its own bounded transaction, with an event-loop yield between writes. The continuous collector processes at most five pages per poll cycle before a longer read window, so a large catch-up cannot monopolize the single SQLite volume or the web event loop. A crash before the page-level cursor update safely re-reads the same idempotent observations.
 
+SQLite close-time WAL checkpoints are disabled for short-lived request/write connections. The collector performs one explicit passive checkpoint after each bounded poll cycle and exposes its last result in health diagnostics; this avoids surprise multi-second checkpoints inside a request or single-observation commit while keeping WAL growth controlled.
+
 Task state is stored as a versioned SQLite projection rather than rebuilt in application memory. Historical parsing and projection use fixed-size transactions with durable row-ID checkpoints; an interrupted process resumes the same migration. List, search, DID, aggregate, HTML, and individual-task evidence queries are paginated and capped at 200 rows. Startup schema checks do not replay history, and the collector continues from the existing persisted cursor while maintenance runs in a background thread.
 
 Partial history is an expected retention condition, not evidence of malformed or malicious work. The UI shows the exact missing sequence range, the number of affected jobs, known unobserved origin types such as JOB/CREATE, and explicitly says when the missing event type cannot be determined. Future work collected from its first event may be complete.

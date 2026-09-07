@@ -37,6 +37,7 @@ class Collector:
         self.running = False
         self.last_success_at: str | None = None
         self.last_error: str | None = None
+        self.last_wal_checkpoint: dict | None = None
 
     async def refresh_metadata(self, client: httpx.AsyncClient) -> None:
         agent = (await client.get("/.well-known/agent.json")).raise_for_status().json()
@@ -116,6 +117,7 @@ class Collector:
             try:
                 await self.collect_once(refresh_metadata=first, max_pages=self.catchup_pages,
                                         write_pause_seconds=self.write_pause_seconds)
+                self.last_wal_checkpoint = await asyncio.to_thread(self.store.checkpoint_wal)
                 first = False
                 self.last_success_at = datetime.now(UTC).isoformat()
                 self.last_error = None
@@ -131,5 +133,6 @@ class Collector:
                 "catchup_page_limit": self.catchup_pages,
                 "write_batch_size": self.write_batch_size,
                 "write_pause_seconds": self.write_pause_seconds,
+                "last_wal_checkpoint": self.last_wal_checkpoint,
                 "gap_count": gap_count, "gaps": self.store.gaps(self.room, limit=20),
                 "gaps_truncated": gap_count > 20}

@@ -67,6 +67,7 @@ class Store:
     def connect(self) -> Iterator[sqlite3.Connection]:
         db = sqlite3.connect(self.path, timeout=30)
         db.row_factory = sqlite3.Row
+        db.setconfig(sqlite3.SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, True)
         db.execute("PRAGMA busy_timeout=30000")
         try:
             yield db
@@ -548,3 +549,9 @@ class Store:
             return {"available": True, "journal_mode": journal_mode}
         except sqlite3.Error as exc:
             return {"available": False, "error": type(exc).__name__}
+
+    def checkpoint_wal(self) -> dict[str, int]:
+        with self.connect() as db:
+            busy, log_pages, checkpointed_pages = db.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
+        return {"busy": int(busy), "log_pages": int(log_pages),
+                "checkpointed_pages": int(checkpointed_pages)}
