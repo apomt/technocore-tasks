@@ -127,9 +127,12 @@ class Store:
         maximum = int(db.execute("SELECT COALESCE(MAX(rowid),0) FROM observations").fetchone()[0])
         parse_status = self._get(db, "parse_status") or "pending"
         projection_status = self._get(db, "projection_status") or "pending"
+        projection_cursor = int(self._get(db, "projection_cursor") or 0)
+        if projection_status == "complete":
+            projection_cursor = maximum
         return {"ready": parse_status == projection_status == "complete",
                 "parse": {"status": parse_status, "cursor": int(self._get(db, "parse_cursor") or 0), "maximum": maximum},
-                "projection": {"status": projection_status, "cursor": int(self._get(db, "projection_cursor") or 0),
+                "projection": {"status": projection_status, "cursor": projection_cursor,
                                "maximum": maximum, "version": PROJECTION_VERSION}}
 
     def maintenance_step(self, batch_size: int = 1000) -> dict:
@@ -444,6 +447,12 @@ class Store:
         size = max(1, min(int(limit), MAX_PAGE_SIZE))
         with self.connect() as db:
             return [dict(row) for row in db.execute(query + " ORDER BY id LIMIT ?", (*args, size)).fetchall()]
+
+    def gap_count(self, room: str | None = None) -> int:
+        query, args = "SELECT COUNT(*) FROM retention_gaps", ()
+        if room is not None: query, args = query + " WHERE room=?", (room,)
+        with self.connect() as db:
+            return int(db.execute(query, args).fetchone()[0])
 
     def save_metadata(self, key: str, value: object) -> None:
         with self.connect() as db:

@@ -51,4 +51,6 @@ def test_api_exposes_pagination_and_maintenance_diagnostics(store, dids):
     assert listing["pagination"]["total"] == 1
     assert health["database"]["available"] is True
     assert health["maintenance"]["ready"] is True
+    assert health["maintenance"]["projection"]["cursor"] == health["maintenance"]["projection"]["maximum"]
+    assert health["collectors"][0]["gap_count"] == 0
     assert health["signing"] is False

@@ -13,6 +13,7 @@
 <section class="history-notice" aria-label="Collection history">
   <div><strong>Collection history</strong><span>{{ collection_history.partial_jobs }} of {{ collection_history.total_jobs }} reconstructed jobs are marked partial.</span></div>
   {% for gap in collection_history.gaps %}<p><b>{{ gap.room }}</b>: initial unrecoverable sequence gap <code>{{ gap.missing_from }}–{{ gap.missing_to }}</code>. Those upstream records were already outside retention when this collector began.</p>{% endfor %}
+  {% if collection_history.gap_count > collection_history.gaps|length %}<p>Showing the first {{ collection_history.gaps|length }} of {{ collection_history.gap_count }} recorded gaps. The complete count remains available from the API.</p>{% endif %}
   <p>Partial means “not all earlier tape was available,” not broken or malicious. Future work whose first event is collected may have complete history.</p>
 </section>
 {% endif %}

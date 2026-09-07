@@ -115,6 +115,8 @@ class Collector:
             await self.sleeper(poll_seconds)
 
     def diagnostics(self) -> dict:
+        gap_count = self.store.gap_count(self.room)
         return {"room": self.room, "running": self.running, "cursor": self.store.cursor(self.room),
                 "last_success_at": self.last_success_at, "last_error": self.last_error,
-                "gaps": self.store.gaps(self.room)}
+                "gap_count": gap_count, "gaps": self.store.gaps(self.room, limit=20),
+                "gaps_truncated": gap_count > 20}

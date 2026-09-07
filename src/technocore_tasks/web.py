@@ -70,6 +70,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "total_jobs": stats["tasks"],
             "partial_jobs": stats["partial_history"],
             "gaps": gaps,
+            "gap_count": store.gap_count(),
             "has_unrecoverable_gap": bool(gaps),
         }
 
