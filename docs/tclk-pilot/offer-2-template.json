@@ -1,0 +1,46 @@
+{
+  "status": "UNSIGNED_TEMPLATE_DO_NOT_POST",
+  "released_tclk": {
+    "version": "v0.1.0",
+    "commit": "54e5caf03da76cd6c3d412ab840f543be018734b",
+    "protocol": "tclk/1"
+  },
+  "target_room": "tclk-offers",
+  "prearmed_tracker_required": true,
+  "fixed_terms": {
+    "from": "did:key:z6MkimcfTzAFj18jNxxYEWenqwr59AEPCWYhvG4qC5WdzrXY",
+    "role": "payer",
+    "asset": "FLOP",
+    "amount": "200",
+    "lock": "hash",
+    "rails": [
+      "paper"
+    ],
+    "job": {
+      "id": "technocore-tasks-v0211-phase1",
+      "proto": "a2a",
+      "context": "https://github.com/apomt/technocore-tasks/blob/63681bbe959b80f05d12a84f32c49a2e5ab26cc5/docs/tclk-pilot/phase1-worker-brief.md"
+    }
+  },
+  "deadline_offsets_ms": {
+    "expiresMs": 64800000,
+    "claimByMs": 151200000,
+    "refundAfterMs": 172800000
+  },
+  "required_fresh_inputs": {
+    "creation_time_ms": "<POSITIVE_INTEGER_AT_APPROVED_BUILD_TIME>",
+    "transport_nonce": "<FRESH_MONOTONIC_INTEGER>",
+    "frame_nonce": "<FRESH_16_TO_64_LOWERCASE_HEX>"
+  },
+  "computed_only_after_fresh_inputs": [
+    "expiresMs",
+    "claimByMs",
+    "refundAfterMs",
+    "id",
+    "canonical frame",
+    "transport signing payload"
+  ],
+  "signature": null,
+  "posted": false,
+  "accounting_notice": "FLOP 200 is a symbolic PaperRail rehearsal amount, not real FLOP payment; no token transfer or monetary payment is promised and no airdrop entitlement is implied."
+}
