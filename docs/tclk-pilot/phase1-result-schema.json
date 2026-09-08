@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Technocore Tasks Phase 1 independent result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "passed",
+    "environment",
+    "fixture",
+    "measurements",
+    "source_before",
+    "source_after",
+    "acceptance_criteria",
+    "benchmark",
+    "failures",
+    "limitations",
+    "immutable_artifact_url",
+    "commands"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "passed": {"type": "boolean"},
+    "environment": {
+      "type": "object",
+      "required": ["python", "platform", "machine"]
+    },
+    "fixture": {
+      "type": "object",
+      "required": ["synthetic_only", "jobs", "observations", "hot_task_events", "input_bytes", "input_sha256"],
+      "properties": {
+        "synthetic_only": {"const": true},
+        "jobs": {"type": "integer", "minimum": 1},
+        "observations": {"type": "integer", "minimum": 1},
+        "hot_task_events": {"type": "integer", "minimum": 4},
+        "input_bytes": {"type": "integer", "minimum": 1},
+        "input_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "required": ["total_wall_seconds", "peak_rss_bytes", "peak_rss_mib"]
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "passed", "evidence"]
+      }
+    },
+    "failures": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "immutable_artifact_url": {"type": "string", "minLength": 1},
+    "commands": {"type": "array", "minItems": 2, "items": {"type": "string"}}
+  }
+}

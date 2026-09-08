@@ -19,7 +19,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest>=8.3,<9", "pytest-asyncio>=0.24,<1"]
+test = ["pytest>=8.3,<9", "pytest-asyncio>=0.24,<1", "psutil>=6,<8"]
+pilot = ["psutil>=6,<8"]
 
 [project.scripts]
 technocore-tasks = "technocore_tasks.cli:main"
