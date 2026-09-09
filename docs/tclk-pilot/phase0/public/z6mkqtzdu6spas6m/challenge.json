@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "kind": "technocore-tasks-phase0-challenge",
+  "candidate_did": "did:key:z6MkqTZDu6spas6mR14GePVyUuWcEcGREGeKZKFbSGwigmbq",
+  "qualification_id": "tt-v0211-phase0-20260909",
+  "public_nonce": "1788951600001",
+  "fixture_seed": "879c2042d02fcd159e9875d002ee672edf69c2132eee6b5ee14909892fde8531",
+  "release_commit": "a2cd3185210b5bc09eb48d720fb2fe2a3eb07d3f",
+  "limits": {"memory_mib": 256, "timeout_seconds": 60},
+  "fixture": {
+    "filename": "phase0.db",
+    "synthetic_only": true,
+    "sha256": "77a7630508f2091114cb432cea8bd19828e39fafb7d8bf16131da65bf831e6e3",
+    "jobs": 71,
+    "observations": 517,
+    "cursor": 517,
+    "hot_task_id": "k0000000000",
+    "hot_task_events": 237,
+    "sample_task_id": "k0000000001",
+    "sample_task_state": "attested"
+  },
+  "challenge_id": "0x78bebceabb82d0980a272ad7d37cd5e13d4f43d5482d30b5f931ccbe9f6e06e3"
+}

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:technocore-tasks:phase0:challenge:1",
+  "title": "Technocore Tasks v0.2.11 candidate-specific Phase 0 challenge",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "candidate_did", "qualification_id", "public_nonce", "fixture_seed", "release_commit", "limits", "fixture", "challenge_id"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "technocore-tasks-phase0-challenge"},
+    "candidate_did": {"type": "string", "pattern": "^did:key:z6Mk[1-9A-HJ-NP-Za-km-z]{44}$"},
+    "qualification_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+    "public_nonce": {"type": "string", "pattern": "^[0-9]{1,19}$"},
+    "fixture_seed": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "release_commit": {"const": "a2cd3185210b5bc09eb48d720fb2fe2a3eb07d3f"},
+    "challenge_id": {"type": "string", "pattern": "^0x[0-9a-f]{64}$"},
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["memory_mib", "timeout_seconds"],
+      "properties": {
+        "memory_mib": {"type": "integer", "minimum": 64, "maximum": 1024},
+        "timeout_seconds": {"type": "integer", "minimum": 10, "maximum": 180}
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filename", "synthetic_only", "sha256", "jobs", "observations", "cursor", "hot_task_id", "hot_task_events", "sample_task_id", "sample_task_state"],
+      "properties": {
+        "filename": {"const": "phase0.db"},
+        "synthetic_only": {"const": true},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "jobs": {"type": "integer", "minimum": 2, "maximum": 500},
+        "observations": {"type": "integer", "minimum": 8, "maximum": 5000},
+        "cursor": {"type": "integer", "minimum": 8, "maximum": 5000},
+        "hot_task_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "hot_task_events": {"type": "integer", "minimum": 4, "maximum": 500},
+        "sample_task_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "sample_task_state": {"const": "attested"}
+      }
+    }
+  }
+}

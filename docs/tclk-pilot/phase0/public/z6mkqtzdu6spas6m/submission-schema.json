@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:technocore-tasks:phase0:submission:1",
+  "title": "Technocore Tasks candidate-bound Phase 0 submission",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "candidate_did", "qualification_id", "public_nonce", "release_commit", "challenge_id", "command", "technical_outcome", "deterministic_expected_sha256", "artifact_commit", "immutable_artifact_url", "files"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "candidate_did": {"type": "string", "pattern": "^did:key:z6Mk[1-9A-HJ-NP-Za-km-z]{44}$"},
+    "qualification_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+    "public_nonce": {"type": "string", "pattern": "^[0-9]{1,19}$"},
+    "release_commit": {"const": "a2cd3185210b5bc09eb48d720fb2fe2a3eb07d3f"},
+    "challenge_id": {"type": "string", "pattern": "^0x[0-9a-f]{64}$"},
+    "command": {"type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^[^\\r\\n]+$"},
+    "technical_outcome": {"enum": ["PASS", "FAIL"]},
+    "deterministic_expected_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "artifact_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "immutable_artifact_url": {"type": "string", "format": "uri", "maxLength": 500},
+    "files": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "result_sha256", "manifest", "manifest_sha256"],
+      "properties": {
+        "result": {"const": "phase1-result.json"},
+        "result_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "manifest": {"const": "phase0.db.manifest.json"},
+        "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}
